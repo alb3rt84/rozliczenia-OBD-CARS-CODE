@@ -1,1 +1,1601 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cars Code - Centrum Zarządzania</title>
+  <style>
+    :root { 
+      --cars-blue: #00a8ff; 
+      --dark-bg: #0d1117; 
+      --neon-green: #39ff14; 
+      --neon-yellow: #fff01f;
+      --own-work: #a55eea;
+      --accent: #00d9ff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Segoe UI', 'Inter', sans-serif; 
+      background: linear-gradient(135deg, #0b0e14 0%, #1a1f2e 100%);
+      padding: 20px; 
+      font-size: 16px;
+      min-height: 100vh; 
+      color: #e6edf3; 
+    }
 
+    .container { 
+      width: 100%;
+      max-width: none;
+      margin: 0 auto; 
+      background: rgba(13, 17, 23, 0.7);
+      backdrop-filter: blur(20px);
+      padding: 30px; 
+      border-radius: 20px; 
+      border: 1px solid rgba(0, 168, 255, 0.2);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    .section-title {
+      margin: 18px 0 8px;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-weight: 900;
+      color: var(--cars-blue);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .section-title::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--cars-blue);
+      box-shadow: 0 0 10px rgba(0,168,255,.5);
+    }
+
+    .form-wrapper { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 18px; }
+    .form-section {
+      background: rgba(22, 27, 34, 0.5);
+      border: 1px solid rgba(0, 168, 255, 0.15);
+      border-radius: 15px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+    }
+    .form-section:hover { border-color: rgba(0, 168, 255, 0.3); background: rgba(22, 27, 34, 0.7); }
+
+    .form-section-title {
+      font-size: 12px;
+      color: var(--cars-blue);
+      text-transform: uppercase;
+      font-weight: 900;
+      margin-bottom: 15px;
+      letter-spacing: 2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .form-section-title::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: var(--cars-blue); }
+
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .form-group { display: flex; flex-direction: column; }
+
+    .form-group label,
+    .edit-form-group label {
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      font-weight: 800;
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+    }
+
+    input, select { 
+      padding: 12px; 
+      background: rgba(13, 17, 23, 0.8);
+      border: 1.5px solid #30363d;
+      border-radius: 10px; 
+      color: white; 
+      font-size: 15px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--cars-blue);
+      box-shadow: 0 0 15px rgba(0, 168, 255, 0.3);
+      background: rgba(13, 17, 23, 0.95);
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.8); cursor: pointer; }
+
+    .form-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .btn { 
+      padding: 13px 20px; 
+      border: none; 
+      border-radius: 10px; 
+      cursor: pointer; 
+      font-weight: 800; 
+      text-transform: uppercase; 
+      font-size: 11px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.3s ease;
+      letter-spacing: 1px;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .btn:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+    .btn:active { transform: translateY(-1px); }
+
+    .btn-add { 
+      background: linear-gradient(135deg, var(--cars-blue), #0072ff);
+      color: white;
+      border: 1px solid rgba(0, 168, 255, 0.5);
+    }
+    .btn-adv-global { 
+      background: linear-gradient(135deg, #ffc107, #ff9800);
+      color: #000;
+      border: 1px solid rgba(255, 193, 7, 0.5);
+    }
+
+    .status-btn { font-size: 10px; padding: 6px 12px; min-width: 110px; }
+    .status-paid { background: linear-gradient(135deg, #2ecc71, #27ae60); color: white; border: 1px solid rgba(46, 204, 113, 0.5); }
+    .status-unpaid { background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; border: 1px solid rgba(231, 76, 60, 0.5); }
+
+    .btn-edit { background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1.5px solid #f39c12; padding: 6px 12px; font-size: 10px; }
+    .btn-del { background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1.5px solid #e74c3c; padding: 6px 12px; font-size: 10px; }
+    .btn-dup { background: rgba(0, 217, 255, 0.10); color: var(--accent); border: 1.5px solid rgba(0, 217, 255, 0.6); padding: 6px 12px; font-size: 10px; }
+    .btn-adv-row { background: rgba(255, 240, 31, 0.12); color: var(--neon-yellow); border: 1.5px solid rgba(255, 240, 31, 0.6); padding: 6px 12px; font-size: 10px; }
+    .btn-add-row { background: rgba(0, 168, 255, 0.10); color: var(--cars-blue); border: 1.5px solid rgba(0, 168, 255, 0.55); padding: 6px 12px; font-size: 10px; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; border-radius: 10px; overflow: hidden; }
+    th { 
+      background: linear-gradient(135deg, rgba(0, 168, 255, 0.1), rgba(0, 217, 255, 0.05));
+      color: var(--cars-blue);
+      padding: 15px; 
+      text-align: left; 
+      border-bottom: 2px solid rgba(0, 168, 255, 0.2);
+      font-size: 12px;
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+    td { padding: 14px 15px; border-bottom: 1px solid rgba(48, 54, 61, 0.5); font-size: 15px; vertical-align: top; }
+    tbody tr { transition: all 0.2s ease; }
+    tbody tr:hover { background: rgba(0, 168, 255, 0.05); }
+
+    .row-own { border-left: 4px solid var(--own-work); background: rgba(165, 94, 234, 0.06); }
+
+    .summary-box { 
+      margin-top: 30px; 
+      padding: 25px; 
+      background: linear-gradient(135deg, rgba(0, 168, 255, 0.1), rgba(165, 94, 234, 0.05));
+      border: 1.5px solid rgba(0, 168, 255, 0.2);
+      border-radius: 15px;
+      backdrop-filter: blur(10px);
+    }
+    .summary-box .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 15px; color: #8b949e; padding: 8px 0; gap: 12px; }
+    .summary-box .row span { font-weight: 700; color: #e6edf3; }
+    .final-row { border-top: 2px solid rgba(0, 168, 255, 0.2); padding-top: 18px; margin-top: 15px; font-weight: 900; font-size: 1.8rem; }
+    .final-row span { background: linear-gradient(135deg, var(--neon-green), var(--cars-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; }
+    .table-wrap table { min-width: 1750px; }
+
+    .sortbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(0, 168, 255, 0.06);
+      border: 1px solid rgba(0, 168, 255, 0.12);
+      margin-bottom: 10px;
+    }
+    .sortbar label {
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: 1px;
+    }
+    .sortbar .sortgroup { display: flex; gap: 8px; align-items: center; }
+
+    #statsContainer { display: none; margin-top: 30px; }
+    .stats-controls { 
+      display: flex; gap: 15px; margin-bottom: 20px; align-items: center;
+      background: rgba(0, 168, 255, 0.08);
+      padding: 15px; border-radius: 12px;
+      border: 1px solid rgba(0, 168, 255, 0.15);
+    }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+    .stat-card { background: rgba(48, 54, 61, 0.4); padding: 20px; border-radius: 12px; border: 1px solid rgba(0, 168, 255, 0.15); backdrop-filter: blur(10px); }
+    .stat-title { font-size: 12px; color: var(--cars-blue); text-transform: uppercase; margin-bottom: 15px; font-weight: 900; border-bottom: 1px solid rgba(0, 168, 255, 0.2); padding-bottom: 10px; }
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
+    .btn-unlock { background: rgba(0, 168, 255, 0.1); color: var(--cars-blue); margin: 25px auto; font-size: 11px; border: 1.5px solid var(--cars-blue); padding: 12px 25px; }
+
+    #editModal, #itemPaymentsModal, #generalPaymentsModal, #editPaymentModal, #addToItemModal {
+      display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8); backdrop-filter: blur(8px);
+      align-items: center; justify-content: center;
+    }
+    #editModal.active, #itemPaymentsModal.active, #generalPaymentsModal.active, #editPaymentModal.active, #addToItemModal.active { display: flex; }
+
+    .edit-modal-content, .payment-modal-content {
+      background: linear-gradient(135deg, rgba(13, 17, 23, 0.95), rgba(22, 27, 34, 0.95));
+      padding: 35px; width: 92%;
+      border-radius: 18px; border: 1.5px solid rgba(0, 168, 255, 0.3);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+    .edit-modal-content { max-width: 900px; }
+    .payment-modal-content { max-width: 820px; }
+    .edit-modal-content h3, .payment-modal-content h3 { color: var(--cars-blue); margin-bottom: 20px; text-align: center; }
+
+    .edit-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 15px; }
+    .edit-form-group { display: flex; flex-direction: column; }
+
+    .edit-modal-buttons { display: flex; gap: 12px; margin-top: 20px; }
+    .edit-modal-buttons button { flex: 1; }
+
+    .payment-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(0, 168, 255, 0.08); border-radius: 8px; margin-bottom: 10px; gap: 10px; }
+    .payment-item-content { display: flex; flex-direction: column; gap: 4px; }
+    .payment-item-date { color: #8b949e; font-size: 12px; }
+    .payment-item-amount { color: var(--neon-yellow); font-weight: bold; font-size: 15px; }
+    .payment-item-desc { color: #c9d1d9; font-size: 13px; }
+    .payment-item-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+
+    /* ✅ TABS */
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1.5px solid rgba(0, 168, 255, 0.25);
+      background: rgba(0, 168, 255, 0.06);
+      color: #c9d1d9;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all .2s ease;
+      user-select: none;
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, rgba(0, 168, 255, 0.22), rgba(0, 114, 255, 0.12));
+      border-color: rgba(0, 168, 255, 0.55);
+      color: white;
+      box-shadow: 0 0 18px rgba(0, 168, 255, 0.18);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    @media print { .no-print { display: none !important; } .row-own { display: none; } }
+    @media (max-width: 1024px) { .form-grid { grid-template-columns: repeat(2, 1fr); } .form-buttons { grid-template-columns: 1fr; } }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="form-wrapper no-print">
+      <div class="form-section">
+        <div class="form-section-title">📅 Data & Typ Usługi</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Data</label>
+            <input type="date" id="d" />
+          </div>
+          <div class="form-group">
+            <label>Typ Zlecenia</label>
+            <select id="type">
+              <option value="service">Zlecenie Główne</option>
+              <option value="own">Praca Prywatna</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Nazwisko klienta</label>
+            <input type="text" id="clientLastName" placeholder="np. Kowalski" />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">🚗 Pojazd</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Marka</label>
+            <select id="brand" onchange="updateModels()">
+              <option value="">Wybierz markę...</option>
+              <option value="Audi">Audi</option><option value="Alfa Romeo">Alfa Romeo</option><option value="BMW">BMW</option>
+              <option value="Citroën">Citroën</option><option value="Cupra">Cupra</option><option value="DS">DS</option>
+              <option value="Fiat">Fiat</option><option value="Ford">Ford</option><option value="Hyundai">Hyundai</option>
+              <option value="Jaguar">Jaguar</option><option value="Jeep">Jeep</option><option value="Kia">Kia</option>
+              <option value="Lamborghini">Lamborghini</option><option value="Lancia">Lancia</option><option value="Land Rover">Land Rover</option>
+              <option value="Maserati">Maserati</option><option value="Mazda">Mazda</option><option value="Mercedes-Benz">Mercedes-Benz</option>
+              <option value="MG">MG</option><option value="Mini">Mini</option><option value="Nissan">Nissan</option>
+              <option value="Opel">Opel</option><option value="Peugeot">Peugeot</option><option value="Porsche">Porsche</option>
+              <option value="Renault">Renault</option><option value="Rolls-Royce">Rolls-Royce</option><option value="Seat">Seat</option>
+              <option value="Skoda">Skoda</option><option value="Smart">Smart</option><option value="Subaru">Subaru</option>
+              <option value="Suzuki">Suzuki</option><option value="Tesla">Tesla</option><option value="Toyota">Toyota</option>
+              <option value="Volkswagen">Volkswagen</option><option value="Volvo">Volvo</option>
+              <option value="Dacia">Dacia</option><option value="Ferrari">Ferrari</option><option value="McLaren">McLaren</option><option value="Aston Martin">Aston Martin</option><option value="Bentley">Bentley</option><option value="Bugatti">Bugatti</option>
+              <option value="Iveco">Iveco</option><option value="MAN">MAN</option>
+              <option value="Dacia">Dacia</option><option value="Ferrari">Ferrari</option><option value="McLaren">McLaren</option><option value="Aston Martin">Aston Martin</option><option value="Bentley">Bentley</option><option value="Bugatti">Bugatti</option>
+              <option value="Iveco">Iveco</option><option value="MAN">MAN</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Model</label>
+            <select id="model" onchange="clearSubmodel()">
+              <option value="">Wybierz model...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Podmodel</label>
+            <input type="text" id="submodel" placeholder="np. 330i, S-Line" />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">✏️ Szczegóły (pierwsza usługa)</div>
+        <div class="form-grid">
+          <div class="form-group" style="grid-column: 1 / -1">
+            <label>Opis usługi</label>
+            <input type="text" id="n" placeholder="np. wymiana oleju" />
+          </div>
+          <div class="form-group">
+            <label>Kwota robocizny (zł)</label>
+            <input type="number" id="p" placeholder="Kwota" step="0.01" inputmode="decimal" />
+          </div>
+        </div>
+        <div style="margin-top:12px; color:#8b949e; font-size:13px;">
+          Dalsze usługi/części dopisujesz przyciskiem <strong style="color:#e6edf3;">➕ Dodaj</strong> przy pozycji na liście.
+        </div>
+      </div>
+
+      <div class="form-buttons">
+        <button class="btn btn-add" onclick="addItem()">➕ Dodaj pozycję</button>
+        <button class="btn btn-adv-global" onclick="openGeneralPaymentsModal()">💰 Dodaj płatność (ogólna)</button>
+      </div>
+    </div>
+
+    <div class="section-title">Pozycje</div>
+
+    <div class="sortbar no-print">
+      <div class="sortgroup">
+        <label>Sortuj po</label>
+        <select id="sortField" onchange="update()">
+          <option value="date">Dacie</option>
+          <option value="amount">Kwocie</option>
+        </select>
+      </div>
+
+      <div class="sortgroup">
+        <label>Kierunek</label>
+        <select id="sortDir" onchange="update()">
+          <option value="desc">Malejąco</option>
+          <option value="asc">Rosnąco</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="no-print" style="width: 120px">Status</th>
+            <th style="width: 105px">Data</th>
+            <th style="min-width:240px;">Opis / Typ</th>
+            <th style="width: 200px">Pojazd</th>
+            <th style="width: 320px">Usługi (lista)</th>
+            <th style="width: 150px">Suma usług</th>
+            <th style="width: 320px">Części (lista)</th>
+            <th style="width: 150px">Suma części</th>
+            <th style="width: 140px">Zaliczki</th>
+            <th style="width: 140px">Bilans</th>
+            <th class="no-print" style="width: 520px">Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="listServices"></tbody>
+      </table>
+    </div>
+
+    <div class="section-title">Płatności (ogólne)</div>
+    <div class="table-wrap">
+      <table style="min-width: 900px;">
+        <thead>
+          <tr>
+            <th style="width: 120px">Typ</th>
+            <th style="width: 120px">Data</th>
+            <th>Opis</th>
+            <th style="width: 160px">Kwota</th>
+            <th class="no-print" style="width: 160px">Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="listPayments"></tbody>
+      </table>
+    </div>
+
+    <div class="summary-box">
+      <div class="row">
+        <span>Suma zleceń klienta:</span>
+        <span id="sP">0.00 zł</span>
+      </div>
+      <div class="row">
+        <span>Wpłacone łącznie (od klienta):</span>
+        <span id="sA" style="color: var(--neon-yellow)">0.00 zł</span>
+      </div>
+      <div class="row final-row">
+        <span>SALDO DO ODBIORU:</span>
+        <span id="fD">0.00 zł</span>
+      </div>
+    </div>
+
+    <button id="unlockBtn" class="btn btn-unlock no-print" onclick="unlockStats()">🔒 Pokaż Statystyki</button>
+    <button id="adminUnlockBtn" class="btn btn-unlock no-print" onclick="toggleAdminMode()">🛡️ Odblokuj admina</button>
+
+    <div id="statsContainer" class="no-print">
+      <div class="stats-controls">
+        <span style="font-weight: 700;">Okres:</span>
+        <select id="statMonth" onchange="updateStats()" style="flex: 1;"></select>
+        <select id="statYear" onchange="updateStats()" style="flex: 1;"></select>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-title">📊 Wynik za wybrany okres</div>
+          <div class="stat-row">
+            <span>Zlecenia Klient:</span>
+            <span id="stClient">0.00 zł</span>
+          </div>
+          <div class="stat-row">
+            <span>Prace Prywatne:</span>
+            <span id="stOwn">0.00 zł</span>
+          </div>
+          <div class="stat-row" style="font-weight:bold; color:var(--neon-green); border-top:1px solid rgba(0,168,255,0.2); padding-top:10px; margin-top:10px;">
+            <span>SUMA PRZYCHODU:</span>
+            <span id="stTotal">0.00 zł</span>
+          </div>
+        </div>
+      </div>
+      <button class="btn no-print" style="background: rgba(0, 168, 255, 0.1); margin-top:20px; color: var(--cars-blue); border: 1px solid var(--cars-blue);" onclick="lockStats()">Ukryj statystyki</button>
+    </div>
+  </div>
+
+<!-- MODAL: EDYCJA POZYCJI rozbudowany -->
+<div id="editModal" class="no-print">
+  <div class="edit-modal-content">
+    <h3>✎ Edytuj pozycję</h3>
+    <form class="edit-form" onsubmit="saveEdit(event)">
+      <div class="edit-form-group">
+        <label>Data</label>
+        <input type="date" id="editD" />
+      </div>
+      <div class="edit-form-group">
+        <label>Typ</label>
+        <select id="editType">
+          <option value="service">Zlecenie Główne</option>
+          <option value="own">Praca Prywatna</option>
+        </select>
+      </div>
+      <div class="edit-form-group">
+        <label>Nazwisko klienta</label>
+        <input type="text" id="editClientLastName" />
+      </div>
+      <div class="edit-form-group">
+        <label>Marka</label>
+        <select id="editBrand" onchange="updateModels(true)">
+          <option value="">Wybierz markę...</option>
+          <option value="Audi">Audi</option><option value="Alfa Romeo">Alfa Romeo</option><option value="BMW">BMW</option>
+          <option value="Citroën">Citroën</option><option value="Cupra">Cupra</option><option value="DS">DS</option>
+          <option value="Fiat">Fiat</option><option value="Ford">Ford</option><option value="Hyundai">Hyundai</option>
+          <option value="Jaguar">Jaguar</option><option value="Jeep">Jeep</option><option value="Kia">Kia</option>
+          <option value="Lamborghini">Lamborghini</option><option value="Lancia">Lancia</option><option value="Land Rover">Land Rover</option>
+          <option value="Maserati">Maserati</option><option value="Mazda">Mazda</option><option value="Mercedes-Benz">Mercedes-Benz</option>
+          <option value="MG">MG</option><option value="Mini">Mini</option><option value="Nissan">Nissan</option>
+          <option value="Opel">Opel</option><option value="Peugeot">Peugeot</option><option value="Porsche">Porsche</option>
+          <option value="Renault">Renault</option><option value="Rolls-Royce">Rolls-Royce</option><option value="Seat">Seat</option>
+          <option value="Skoda">Skoda</option><option value="Smart">Smart</option><option value="Subaru">Subaru</option>
+          <option value="Suzuki">Suzuki</option><option value="Tesla">Tesla</option><option value="Toyota">Toyota</option>
+          <option value="Volkswagen">Volkswagen</option><option value="Volvo">Volvo</option>
+          <option value="Dacia">Dacia</option><option value="Ferrari">Ferrari</option><option value="McLaren">McLaren</option><option value="Aston Martin">Aston Martin</option><option value="Bentley">Bentley</option><option value="Bugatti">Bugatti</option>
+          <option value="Iveco">Iveco</option><option value="MAN">MAN</option>
+        </select>
+      </div>
+      <div class="edit-form-group">
+        <label>Model</label>
+        <select id="editModel">
+          <option value="">Wybierz model...</option>
+        </select>
+      </div>
+      <div class="edit-form-group">
+        <label>Podmodel</label>
+        <input type="text" id="editSubmodel" />
+      </div>
+
+      <!-- Usługi -->
+      <div style="grid-column: 1 / -1; margin-top:16px;">
+        <label style="font-size:12px; color:#00a8ff;font-weight:900;text-transform:uppercase;">Usługi</label>
+        <table style="width:100%;margin-bottom:10px;">
+          <thead>
+            <tr><th>Opis</th><th>Kwota</th><th></th></tr>
+          </thead>
+          <tbody id="editServicesList"></tbody>
+        </table>
+        <button type="button" class="btn btn-add-row" style="margin-bottom:6px;" onclick="addEditServiceRow()">➕ Dodaj usługę</button>
+      </div>
+      <!-- Części -->
+      <div style="grid-column: 1 / -1">
+        <label style="font-size:12px; color:#00a8ff;font-weight:900;text-transform:uppercase;">Części</label>
+        <table style="width:100%;margin-bottom:10px;">
+          <thead>
+            <tr><th>Opis</th><th>Kwota</th><th></th></tr>
+          </thead>
+          <tbody id="editPartsList"></tbody>
+        </table>
+        <button type="button" class="btn btn-add-row" onclick="addEditPartRow()">➕ Dodaj część</button>
+      </div>
+      <div class="edit-modal-buttons" style="grid-column: 1 / -1">
+        <button type="submit" class="btn btn-add">💾 Zapisz</button>
+        <button type="button" class="btn" style="background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1.5px solid #e74c3c;" onclick="closeEditModal()">✕ Anuluj</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+
+  <!-- ✅ MODAL: DODAJ DO POZYCJI (TABY) -->
+  <div id="addToItemModal" class="no-print">
+    <div class="payment-modal-content">
+      <h3>➕ Dodaj do pozycji</h3>
+
+      <div class="tabs" role="tablist" aria-label="Dodawanie">
+        <button class="tab-btn active" id="tabServices" type="button" onclick="setAddTab('services')">USŁUGI</button>
+        <button class="tab-btn" id="tabParts" type="button" onclick="setAddTab('parts')">CZĘŚCI</button>
+      </div>
+
+      <div id="panelServices" class="tab-panel active">
+        <form onsubmit="addServiceFromModal(event)">
+          <div class="form-grid" style="margin-bottom: 12px;">
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Opis usługi</label>
+              <input type="text" id="addModalServiceDesc" placeholder="np. geometria, diagnostyka..." />
+            </div>
+            <div class="form-group">
+              <label>Kwota robocizny (zł)</label>
+              <input type="number" id="addModalServiceCost" step="0.01" inputmode="decimal" />
+            </div>
+          </div>
+          <button type="submit" class="btn btn-add" style="width:100%;">➕ Dodaj usługę</button>
+        </form>
+
+        <div style="margin-top:14px;">
+          <div class="form-section-title" style="margin-bottom:10px;">Lista usług</div>
+          <div id="addModalServicesList" style="max-height: 320px; overflow-y:auto;"></div>
+        </div>
+      </div>
+
+      <div id="panelParts" class="tab-panel">
+        <form onsubmit="addPartFromModal(event)">
+          <div class="form-grid" style="margin-bottom: 12px;">
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Opis części</label>
+              <input type="text" id="addModalPartDesc" placeholder="np. filtr oleju, klocki..." />
+            </div>
+            <div class="form-group">
+              <label>Kwota (zł)</label>
+              <input type="number" id="addModalPartCost" step="0.01" inputmode="decimal" />
+            </div>
+          </div>
+          <button type="submit" class="btn btn-add" style="width:100%;">➕ Dodaj część</button>
+        </form>
+
+        <div style="margin-top:14px;">
+          <div class="form-section-title" style="margin-bottom:10px;">Lista części</div>
+          <div id="addModalPartsList" style="max-height: 320px; overflow-y:auto;"></div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:12px; margin-top: 14px;">
+        <button type="button" class="btn" style="flex:1; background: rgba(0, 168, 255, 0.1); color: var(--cars-blue); border: 1px solid var(--cars-blue);" onclick="closeAddToItemModal()">✕ Zamknij</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: zaliczki do usługi (bez typu) -->
+  <div id="itemPaymentsModal" class="no-print">
+    <div class="payment-modal-content">
+      <h3>💰 Zaliczki dla pozycji</h3>
+
+      <form onsubmit="addItemPayment(event)">
+        <div class="form-grid" style="margin-bottom: 12px;">
+          <div class="form-group">
+            <label>Data</label>
+            <input type="date" id="itemPayDate" />
+          </div>
+          <div class="form-group">
+            <label>Kwota (zł)</label>
+            <input type="number" id="itemPayAmount" placeholder="Kwota" step="0.01" inputmode="decimal" required />
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-bottom: 18px;">
+          <button type="submit" class="btn btn-add" style="flex:1;">➕ Dodaj</button>
+          <button type="button" class="btn" style="flex:1; background: rgba(0, 168, 255, 0.1); color: var(--cars-blue); border: 1px solid var(--cars-blue);" onclick="closeItemPaymentsModal()">✕ Zamknij</button>
+        </div>
+      </form>
+
+      <div id="itemPaymentsList" style="max-height: 320px; overflow-y: auto"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: płatności ogólne -->
+  <div id="generalPaymentsModal" class="no-print">
+    <div class="payment-modal-content">
+      <h3>💰 Płatności ogólne</h3>
+
+      <form onsubmit="addGeneralPayment(event)">
+        <div class="form-grid" style="margin-bottom: 12px;">
+          <div class="form-group">
+            <label>Typ</label>
+            <select id="genPayKind">
+              <option value="received">OTRZYMANE</option>
+              <option value="paid">WPŁACONE</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Data</label>
+            <input type="date" id="genPayDate" />
+          </div>
+          <div class="form-group">
+            <label>Kwota (zł)</label>
+            <input type="number" id="genPayAmount" placeholder="Kwota" step="0.01" inputmode="decimal" required />
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1">
+            <label>Opis</label>
+            <input type="text" id="genPayDesc" placeholder="np. części, lakier, transport..." />
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-bottom: 18px;">
+          <button type="submit" class="btn btn-add" style="flex:1;">➕ Dodaj</button>
+          <button type="button" class="btn" style="flex:1; background: rgba(0, 168, 255, 0.1); color: var(--cars-blue); border: 1px solid var(--cars-blue);" onclick="closeGeneralPaymentsModal()">✕ Zamknij</button>
+        </div>
+      </form>
+
+      <div id="generalPaymentsList" style="max-height: 320px; overflow-y: auto"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: edycja płatności -->
+  <div id="editPaymentModal" class="no-print">
+    <div class="edit-modal-content" style="max-width: 520px;">
+      <h3>✎ Edytuj płatność</h3>
+      <form onsubmit="saveEditPayment(event)">
+        <div class="edit-form-group" id="editPayKindWrap">
+          <label>Typ (tylko ogólne)</label>
+          <select id="editPayKind">
+            <option value="received">OTRZYMANE</option>
+            <option value="paid">WPŁACONE</option>
+          </select>
+        </div>
+
+        <div class="edit-form-group" id="editPayDescWrap" style="grid-column: 1 / -1">
+          <label>Opis (tylko ogólne)</label>
+          <input type="text" id="editPayDesc" />
+        </div>
+
+        <div class="edit-form-group"><label>Data</label><input type="date" id="editPayDate" /></div>
+        <div class="edit-form-group"><label>Kwota (zł)</label><input type="number" id="editPayAmount" placeholder="Kwota" step="0.01" inputmode="decimal" /></div>
+
+        <div class="edit-modal-buttons">
+          <button type="submit" class="btn btn-add">💾 Zapisz</button>
+          <button type="button" class="btn" style="background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1.5px solid #e74c3c;" onclick="closeEditPaymentModal()">✕ Anuluj</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const AUTO_PAYMENT_TAG = "AUTO_PAID";
+    const SECRET_PASSWORD = "admin123";
+    let userCanDelete = false; // zmienna dynamiczna: tylko administrator może usuwać
+    const plMonths = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
+
+    let state = JSON.parse(localStorage.getItem('cc_v31_tabs')) || { items: [], generalPayments: [] };
+    if (!state.items) state.items = [];
+    if (!state.generalPayments) state.generalPayments = [];
+    function saveState() { localStorage.setItem('cc_v31_tabs', JSON.stringify(state)); }
+
+    function updateAdminButton() {
+      const btn = document.getElementById('adminUnlockBtn');
+      if (!btn) return;
+      btn.innerText = userCanDelete ? '🔒 Admin: włączony' : '🛡️ Odblokuj admina';
+    }
+
+    function toggleAdminMode() {
+      if (userCanDelete) {
+        if (!confirm('Wyłączyć tryb administratora?')) return;
+        userCanDelete = false;
+        alert('Tryb administratora wyłączony.');
+      } else {
+        const pass = prompt('Wprowadź hasło administratora:');
+        if (pass === null) return;
+        if (pass === SECRET_PASSWORD) {
+          userCanDelete = true;
+          alert('Tryb administratora włączony. Możesz usuwać pozycje i płatności.');
+        } else {
+          alert('Błędne hasło.');
+        }
+      }
+      updateAdminButton();
+      update();
+      renderAddModalLists();
+      renderItemPaymentsList();
+      renderGeneralPaymentsList();
+    }
+
+    let editId = null;
+    let itemPaymentsItemId = null;
+    let editPaymentCtx = null;
+    let addModalItemId = null;
+    let addModalTab = 'services';
+
+let editServices = [];
+let editParts = [];
+
+function openEditModal(id) {
+  const it = getItemById(id);
+  if (!it) return;
+
+  editId = id;
+  document.getElementById('editD').value = it.d || '';
+  document.getElementById('editType').value = it.type || 'service';
+  document.getElementById('editClientLastName').value = it.clientLastName || '';
+
+  document.getElementById('editBrand').value = it.brand || '';
+  updateModels(true);
+  document.getElementById('editModel').value = it.model || '';
+  document.getElementById('editSubmodel').value = it.submodel || '';
+
+  // Skopiuj usługi i części do lokalnych tablic tymczasowych
+  editServices = (it.services || []).map(s => ({...s}));
+  editParts = (it.parts || []).map(p => ({...p}));
+
+  renderEditServicesList();
+  renderEditPartsList();
+
+  document.getElementById('editModal').classList.add('active');
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('active');
+  editId = null;
+}
+
+function updateServiceDesc(idx, value) {
+  editServices[idx].desc = value;
+}
+
+function updateServiceCost(idx, value) {
+  editServices[idx].cost = parseFloat(value) || 0;
+}
+
+function updatePartDesc(idx, value) {
+  editParts[idx].desc = value;
+}
+
+function updatePartCost(idx, value) {
+  editParts[idx].cost = parseFloat(value) || 0;
+}
+
+// Rysowanie dynamicznych list usług i części w modalu
+function renderEditServicesList() {
+  const tbody = document.getElementById('editServicesList');
+  tbody.innerHTML = '';
+  editServices.forEach((s, idx) => {
+    tbody.innerHTML += `
+      <tr>
+        <td><input type="text" value="${s.desc || ''}" oninput="updateServiceDesc(${idx}, this.value)" style="width:98%"/></td>
+        <td><input type="number" step="0.01" value="${s.cost || ''}" oninput="updateServiceCost(${idx}, this.value)" style="width:90px"/></td>
+        <td>${userCanDelete ? `<button type="button" class="btn btn-del" onclick="removeEditServiceRow(${idx})">🗑️</button>` : ''}</td>
+      </tr>
+    `;
+  });
+}
+
+function renderEditPartsList() {
+  const tbody = document.getElementById('editPartsList');
+  tbody.innerHTML = '';
+  editParts.forEach((p, idx) => {
+    tbody.innerHTML += `
+      <tr>
+        <td><input type="text" value="${p.desc || ''}" oninput="updatePartDesc(${idx}, this.value)" style="width:98%"/></td>
+        <td><input type="number" step="0.01" value="${p.cost || ''}" oninput="updatePartCost(${idx}, this.value)" style="width:90px"/></td>
+        <td>${userCanDelete ? `<button type="button" class="btn btn-del" onclick="removeEditPartRow(${idx})">🗑️</button>` : ''}</td>
+      </tr>
+    `;
+  });
+}
+
+function addEditServiceRow() {
+  editServices.unshift({desc: '', cost: 0, id: Date.now() + Math.floor(Math.random()*1000)});
+  renderEditServicesList();
+}
+
+function removeEditServiceRow(idx) {
+  editServices.splice(idx, 1);
+  renderEditServicesList();
+}
+
+function addEditPartRow() {
+  editParts.unshift({desc: '', cost: 0, id: Date.now() + Math.floor(Math.random()*1000)});
+  renderEditPartsList();
+}
+
+function removeEditPartRow(idx) {
+  editParts.splice(idx, 1);
+  renderEditPartsList();
+}
+
+// PODMIANA saveEdit
+function saveEdit(e) {
+  e.preventDefault();
+  const it = getItemById(editId);
+  if (!it) return;
+
+  it.d = document.getElementById('editD').value || it.d;
+  it.type = document.getElementById('editType').value;
+  it.clientLastName = (document.getElementById('editClientLastName').value || '').trim();
+  it.brand = document.getElementById('editBrand').value || '';
+  it.model = document.getElementById('editModel').value || '';
+  it.submodel = (document.getElementById('editSubmodel').value || '').trim();
+
+  // Podmień na zaktualizowane listy
+  it.services = editServices.map(s => ({
+    desc: s.desc || '',
+    cost: parseFloat(s.cost) || 0,
+    id: s.id || Date.now() + Math.floor(Math.random()*1000)
+  }));
+  it.parts = editParts.map(p => ({
+    desc: p.desc || '',
+    cost: parseFloat(p.cost) || 0,
+    id: p.id || Date.now() + Math.floor(Math.random()*1000)
+  }));
+
+  saveState();
+  closeEditModal();
+  update();
+}
+
+    const MODELS = {
+      "Audi": ["A3","A4","A5","A6","A7","A8","Q2","Q3","Q5","Q7","Q8","TT","R8","S3","S4","S5","S6","S7","S8","RS3","RS4","RS5","RS6","RS7","e-tron","e-tron GT"],
+      "Alfa Romeo": ["Giulia","Stelvio","Giulietta","MiTo","147","156","159","Brera","Spider","GT","Tonale"],
+      "BMW": ["1","2","3","4","5","6","7","8","X1","X2","X3","X4","X5","X6","X7","Z4","i3","i4","i7","iX","M1","M2","M3","M4","M5","M6","M8","i8"],
+      "Citroën": ["C3","C4","C5","Berlingo","Jumpy","C1","C2","C6","C8","Nemo","Jumper"],
+      "Cupra": ["Formentor","Leon","Ateca","Born"],
+      "DS": ["DS 3","DS 4","DS 7","DS 9"],
+      "Fiat": ["500","Panda","Tipo","Doblo","Punto","Bravo","Stilo","Croma","Multipla","Seicento","Idea","500L","500X","124 Spider","Ducato","Fiorino","Scudo","Ulysse"],
+      "Ford": ["Fiesta","Focus","Mondeo","Kuga","S-Max","Transit"],
+      "Hyundai": ["i20","i30","Tucson","Santa Fe","Kona"],
+      "Jaguar": ["XE","XF","F-Pace","E-Pace","I-Pace","X-Type","S-Type","XJ","XK","F-Type"],
+      "Jeep": ["Renegade","Compass","Cherokee","Wrangler","Grand Cherokee"],
+      "Kia": ["Ceed","Sportage","Sorento","Rio","Stonic"],
+      "Lamborghini": ["Huracan","Aventador","Urus","Gallardo","Murcielago","Reventon","Sian","Countach","Diablo","Espada"],
+      "Lancia": ["Ypsilon","Y","Delta","Dedra","K","Lybra","Musa","Phedra","Thesis","Voyager"],
+      "Land Rover": ["Discovery","Defender","Range Rover","Evoque","Velar","Freelander","Range Rover Sport"],
+      "Maserati": ["Ghibli","Levante","Quattroporte","Grecale","3200 GT","Spyder","GranSport","GranTurismo","GranCabrio","Alfieri","MC20"],
+      "Mazda": ["2","3","6","CX-3","CX-30","CX-5","MX-5"],
+      "Mercedes-Benz": ["A-Class","B-Class","C-Class","E-Class","S-Class","GLA","GLB","GLC","GLE","GLS","CLA","CLS","CLK","SLK","SL","G-Class","V-Class","Sprinter"],
+      "MG": ["ZS","HS","MG4"],
+      "Mini": ["Cooper","Countryman","Clubman"],
+      "Nissan": ["Micra","Juke","Qashqai","X-Trail","Leaf"],
+      "Opel": ["Corsa","Astra","Insignia","Mokka","Zafira","Agila","Vectra","Signum","Meriva","Combo","Vivaro","Movano","Adam","Karl","Crossland","Grandland"],
+      "Peugeot": ["208","308","508","2008","3008","5008","106","107","108","206","207","306","307","406","407","408","607","806","807","1007","4007","4008","Bipper","Partner","Expert","Boxer"],
+      "Porsche": ["911","Cayenne","Macan","Panamera","Taycan","Boxster","Cayman","718 Boxster","718 Cayman"],
+      "Renault": ["Clio","Megane","Talisman","Captur","Kadjar","Twingo","Modus","Scenic","Grand Scenic","Espace","Vel Satis","Laguna","Koleos","Kangoo","Master","Trafic","Express"],
+      "Rolls-Royce": ["Ghost","Wraith","Cullinan","Phantom"],
+      "Seat": ["Ibiza","Leon","Arona","Ateca","Arosa","Cordoba","Alhambra","Toledo","Exeo","Altea","Tarraco"],
+      "Skoda": ["Fabia","Octavia","Superb","Kodiaq","Kamiq","Karoq","Favorit","Felicia","Roomster","Praktik","Yeti","Scala","Enyaq","Citigo"],
+      "Smart": ["Fortwo","Forfour"],
+      "Subaru": ["Impreza","Forester","Outback","XV"],
+      "Suzuki": ["Swift","Vitara","SX4","Jimny"],
+      "Tesla": ["Model S","Model 3","Model X","Model Y"],
+      "Toyota": ["Yaris","Corolla","Camry","RAV4","Land Cruiser","Hilux"],
+      "Volkswagen": ["Polo","Golf","Passat","Tiguan","Touareg","Transporter","Arteon","ID.3","ID.4","ID.5","Up","Lupo","Bora","Jetta","Scirocco","Eos","Sharan","Caddy","Crafter"],
+      "Volvo": ["S60","S90","V60","V90","XC40","XC60","XC90","S40","V40","V50","C30","V70","XC70","S80","C70"],
+      "Dacia": ["Sandero","Logan","Duster","Lodgy","Dokker"],
+      "Ferrari": ["488","812 Superfast","F8 Tributo","SF90 Stradale","Roma","Portofino","488 Spider","F8 Spider","SF90 Spider"],
+      "McLaren": ["570S","570GT","600LT","620R","650S","675LT","720S","765LT","Senna","Speedtail"],
+      "Aston Martin": ["DB11","Vantage","DBS","Rapide","Vanquish","Virage","Lagonda","Valhalla"],
+      "Bentley": ["Continental GT","Flying Spur","Bentayga","Mulsanne","Arnage","Azure","Brooklands"],
+      "Bugatti": ["Chiron","Divo","Centodieci","La Voiture Noire","Veyron","EB 110"],
+      "Iveco": ["Daily","Stralis","Eurocargo","Trakker"],
+      "MAN": ["TGE","TGM","TGS","TGX"],
+    };
+
+    function parseMoney(v) { return parseFloat((v || '').toString().replace(',', '.')) || 0; }
+    function sumPayments(list) { return (list || []).reduce((acc, x) => acc + (parseFloat(x.p) || 0), 0); }
+    function getItemById(id) { return state.items.find(x => x.id === id); }
+    function getItemAdvTotal(item) { return sumPayments(item?.a || []); }
+
+    function getServicesTotal(item) {
+      return (item?.services || []).reduce((acc, s) => acc + (parseFloat(s.cost) || 0), 0);
+    }
+    function getPartsTotal(item) {
+      return (item?.parts || []).reduce((acc, p) => acc + (parseFloat(p.cost) || 0), 0);
+    }
+    function joinDescs(list) {
+      const descs = (list || []).map(x => (x.desc || '').trim()).filter(Boolean);
+      return descs.length ? descs.join(', ') : '—';
+    }
+
+    function getItemTotal(item) { return getServicesTotal(item) + getPartsTotal(item); }
+    function getItemRemaining(item) {
+      if (!item || item.type === "own" || item.forcePaid) return 0;
+      return getItemTotal(item) - getItemAdvTotal(item);
+    }
+
+    function formatVehicle(item) {
+      const brand = item?.brand || '';
+      const model = item?.model || '';
+      const sub = (item?.submodel || '').trim();
+      const base = [brand, model].filter(Boolean).join(' ');
+      if (!base && !sub) return '—';
+      if (!sub) return base || '—';
+      return `${base} (${sub})`;
+    }
+
+    function enhanceAmountInput(el) {
+      if (!el) return;
+      el.addEventListener('focus', () => {
+        const v = (el.value || '').trim();
+        if (v === '0' || v === '0.0' || v === '0.00') el.value = '';
+        setTimeout(() => el.select(), 0);
+      });
+      el.addEventListener('blur', () => {
+        if (el.value && el.value.includes(',')) el.value = el.value.replace(',', '.');
+      });
+    }
+
+    function updateModels(isEdit = false) {
+      const brandEl = document.getElementById(isEdit ? 'editBrand' : 'brand');
+      const modelEl = document.getElementById(isEdit ? 'editModel' : 'model');
+
+      const brand = brandEl.value;
+      const models = MODELS[brand] || [];
+
+      modelEl.innerHTML = '<option value="">Wybierz model...</option>';
+      models.forEach(m => modelEl.add(new Option(m, m)));
+    }
+    function clearSubmodel() { document.getElementById('submodel').value = ''; }
+
+    window.onload = () => {
+      document.getElementById('d').valueAsDate = new Date();
+      document.getElementById('itemPayDate').valueAsDate = new Date();
+      document.getElementById('genPayDate').valueAsDate = new Date();
+
+      enhanceAmountInput(document.getElementById('p'));
+      enhanceAmountInput(document.getElementById('itemPayAmount'));
+      enhanceAmountInput(document.getElementById('genPayAmount'));
+      enhanceAmountInput(document.getElementById('editPayAmount'));
+      enhanceAmountInput(document.getElementById('addModalServiceCost'));
+      enhanceAmountInput(document.getElementById('addModalPartCost'));
+
+      initStatsFilters();
+      updateAdminButton();
+      update();
+    };
+
+    function setAddTab(tab) {
+      addModalTab = tab;
+
+      document.getElementById('tabServices').classList.toggle('active', tab === 'services');
+      document.getElementById('tabParts').classList.toggle('active', tab === 'parts');
+
+      document.getElementById('panelServices').classList.toggle('active', tab === 'services');
+      document.getElementById('panelParts').classList.toggle('active', tab === 'parts');
+
+      renderAddModalLists();
+    }
+
+    function addItem() {
+      const firstServiceDesc = (document.getElementById('n').value || '').trim() || 'Usługa';
+      const firstServiceCost = parseMoney(document.getElementById('p').value);
+      const d = document.getElementById('d').value || new Date().toISOString().slice(0, 10);
+      const type = document.getElementById('type').value;
+
+      const clientLastName = (document.getElementById('clientLastName').value || '').trim();
+      const brand = document.getElementById('brand').value || '';
+      const model = document.getElementById('model').value || '';
+      const submodel = (document.getElementById('submodel').value || '').trim();
+
+      if (firstServiceCost === 0 && !firstServiceDesc) { alert('⚠️ Wpisz kwotę lub opis!'); return; }
+
+      const item = { 
+        id: Date.now(),
+        d,
+        type,
+        clientLastName,
+        brand, model, submodel,
+        services: [{ id: Date.now() + 1, desc: firstServiceDesc, cost: firstServiceCost }],
+        parts: [],
+        forcePaid: false,
+        a: []
+      };
+
+      state.items.unshift(item);
+
+      document.getElementById('clientLastName').value = '';
+      document.getElementById('brand').value = '';
+      document.getElementById('model').innerHTML = '<option value="">Wybierz model...</option>';
+      document.getElementById('submodel').value = '';
+      document.getElementById('n').value = '';
+      document.getElementById('p').value = '';
+
+      saveState();
+      update();
+    }
+
+
+    function delItem(id) {
+      if (!userCanDelete) { alert('Nie masz uprawnień do usuwania pozycji.'); return; }
+      if (!confirm("Usunąć pozycję?")) return;
+      state.items = state.items.filter(x => x.id !== id);
+      saveState();
+      update();
+    }
+
+    function duplicateItem(id) {
+      const it = getItemById(id);
+      if (!it) return;
+
+      state.items.unshift({
+        id: Date.now(),
+        d: it.d,
+        type: it.type,
+        clientLastName: it.clientLastName || '',
+        brand: it.brand || '',
+        model: it.model || '',
+        submodel: it.submodel || '',
+        services: JSON.parse(JSON.stringify(it.services || [])),
+        parts: JSON.parse(JSON.stringify(it.parts || [])),
+        forcePaid: false,
+        a: []
+      });
+
+      saveState();
+      update();
+    }
+
+    function togglePaid(id) {
+      const it = getItemById(id);
+      if (!it) return;
+      if (!confirm("Zmienić status?")) return;
+
+      if (!it.forcePaid) {
+        const remaining = getItemRemaining(it);
+        if (remaining > 0) {
+          it.a.unshift({ id: Date.now(), d: new Date().toISOString().slice(0, 10), p: remaining, tag: AUTO_PAYMENT_TAG });
+        }
+        it.forcePaid = true;
+      } else {
+        it.forcePaid = false;
+        it.a = (it.a || []).filter(p => p.tag !== AUTO_PAYMENT_TAG);
+      }
+
+      saveState();
+      update();
+      if (itemPaymentsItemId === id) renderItemPaymentsList();
+    }
+
+    function openAddToItemModal(itemId) {
+      const it = getItemById(itemId);
+      if (!it) return;
+
+      if (!Array.isArray(it.services)) it.services = [];
+      if (!Array.isArray(it.parts)) it.parts = [];
+
+      addModalItemId = itemId;
+
+      document.getElementById('addModalServiceDesc').value = '';
+      document.getElementById('addModalServiceCost').value = '';
+      document.getElementById('addModalPartDesc').value = '';
+      document.getElementById('addModalPartCost').value = '';
+
+      document.getElementById('addToItemModal').classList.add('active');
+      setAddTab('services'); // start od usług
+    }
+
+    function closeAddToItemModal() {
+      document.getElementById('addToItemModal').classList.remove('active');
+      addModalItemId = null;
+    }
+
+    function addServiceFromModal(e) {
+      e.preventDefault();
+      const it = getItemById(addModalItemId);
+      if (!it) return;
+
+      const desc = (document.getElementById('addModalServiceDesc').value || '').trim();
+      const cost = parseMoney(document.getElementById('addModalServiceCost').value);
+
+      if (!desc && cost === 0) { alert("⚠️ Wpisz opis lub kwotę usługi!"); return; }
+
+      it.services.unshift({ id: Date.now(), desc, cost });
+
+      document.getElementById('addModalServiceDesc').value = '';
+      document.getElementById('addModalServiceCost').value = '';
+
+      saveState();
+      renderAddModalLists();
+      update();
+    }
+
+    function addPartFromModal(e) {
+      e.preventDefault();
+      const it = getItemById(addModalItemId);
+      if (!it) return;
+
+      const desc = (document.getElementById('addModalPartDesc').value || '').trim();
+      const cost = parseMoney(document.getElementById('addModalPartCost').value);
+
+      if (!desc && cost === 0) { alert("⚠️ Wpisz opis lub kwotę części!"); return; }
+
+      it.parts.unshift({ id: Date.now(), desc, cost });
+
+      document.getElementById('addModalPartDesc').value = '';
+      document.getElementById('addModalPartCost').value = '';
+
+      saveState();
+      renderAddModalLists();
+      update();
+    }
+
+    function delServiceFromItem(itemId, serviceId) {
+      if (!userCanDelete) { alert('Nie masz uprawnień do usuwania usług.'); return; }
+      const it = getItemById(itemId);
+      if (!it) return;
+      if (!confirm("Usunąć tę usługę?")) return;
+
+      it.services = (it.services || []).filter(s => s.id !== serviceId);
+
+      saveState();
+      renderAddModalLists();
+      update();
+    }
+
+    function delPartFromItem(itemId, partId) {
+      if (!userCanDelete) { alert('Nie masz uprawnień do usuwania części.'); return; }
+      const it = getItemById(itemId);
+      if (!it) return;
+      if (!confirm("Usunąć tę część?")) return;
+
+      it.parts = (it.parts || []).filter(p => p.id !== partId);
+
+      saveState();
+      renderAddModalLists();
+      update();
+    }
+
+    function renderAddModalLists() {
+      const it = getItemById(addModalItemId);
+      const servicesWrap = document.getElementById('addModalServicesList');
+      const partsWrap = document.getElementById('addModalPartsList');
+
+      if (!it) { servicesWrap.innerHTML = ''; partsWrap.innerHTML = ''; return; }
+
+      const services = it.services || [];
+      const parts = it.parts || [];
+
+      // zawsze renderujemy obie listy, ale widoczna jest tylko aktywna zakładka
+      servicesWrap.innerHTML = services.length ? services.map(s => `
+        <div class="payment-item">
+          <div class="payment-item-content">
+            <span class="payment-item-desc"><strong>${(s.desc || '—').replaceAll('<','&lt;')}</strong></span>
+            <span class="payment-item-amount">${(parseFloat(s.cost)||0).toFixed(2)} zł</span>
+          </div>
+          <div class="payment-item-actions">
+            ${userCanDelete ? `<button type="button" class="btn btn-del" onclick="delServiceFromItem(${it.id}, ${s.id})">🗑️</button>` : ''}
+          </div>
+        </div>
+      `).join('') : `<div style="color:#8b949e;">Brak usług</div>`;
+
+      partsWrap.innerHTML = parts.length ? parts.map(p => `
+        <div class="payment-item">
+          <div class="payment-item-content">
+            <span class="payment-item-desc"><strong>${(p.desc || '—').replaceAll('<','&lt;')}</strong></span>
+            <span class="payment-item-amount">${(parseFloat(p.cost)||0).toFixed(2)} zł</span>
+          </div>
+          <div class="payment-item-actions">
+            ${userCanDelete ? `<button type="button" class="btn btn-del" onclick="delPartFromItem(${it.id}, ${p.id})">🗑️</button>` : ''}
+          </div>
+        </div>
+      `).join('') : `<div style="color:#8b949e;">Brak części</div>`;
+    }
+
+    // --- ZALICZKI ---
+    function openItemPaymentsModal(itemId) {
+      itemPaymentsItemId = itemId;
+      document.getElementById('itemPayDate').valueAsDate = new Date();
+      document.getElementById('itemPayAmount').value = '';
+      document.getElementById('itemPaymentsModal').classList.add('active');
+      renderItemPaymentsList();
+    }
+
+    function closeItemPaymentsModal() {
+      document.getElementById('itemPaymentsModal').classList.remove('active');
+      itemPaymentsItemId = null;
+    }
+
+    function addItemPayment(e) {
+      e.preventDefault();
+      const it = getItemById(itemPaymentsItemId);
+      if (!it) return;
+
+      const d = document.getElementById('itemPayDate').value || new Date().toISOString().slice(0, 10);
+      const p = parseMoney(document.getElementById('itemPayAmount').value);
+      if (p === 0) { alert("⚠️ Wpisz kwotę!"); return; }
+
+      it.a.unshift({ id: Date.now(), d, p, tag: "" });
+
+      document.getElementById('itemPayAmount').value = '';
+      saveState();
+      renderItemPaymentsList();
+      update();
+    }
+
+    function renderItemPaymentsList() {
+      const it = getItemById(itemPaymentsItemId);
+      const container = document.getElementById('itemPaymentsList');
+      if (!it) { container.innerHTML = '<p style="color:#8b949e;">Brak</p>'; return; }
+
+      container.innerHTML = (it.a || []).map(p => `
+        <div class="payment-item">
+          <div class="payment-item-content">
+            <span class="payment-item-date">${p.d || ''}${p.tag === '${AUTO_PAYMENT_TAG}' ? ' • AUTO' : ''}</span>
+            <span class="payment-item-amount">${(parseFloat(p.p)||0).toFixed(2)} zł</span>
+          </div>
+          <div class="payment-item-actions">
+            <button type="button" class="btn btn-edit" onclick="openEditItemPayment(${it.id}, ${p.id})">✎</button>
+            ${userCanDelete ? `<button type="button" class="btn btn-del" onclick="delItemPayment(${it.id}, ${p.id})">🗑️</button>` : ''}
+          </div>
+        </div>
+      `).join('') || '<p style="color:#8b949e;">Brak</p>';
+    }
+
+    function delItemPayment(itemId, paymentId) {
+      if (!userCanDelete) { alert('Nie masz uprawnień do usuwania zaliczek.'); return; }
+      if (!confirm("Usunąć zaliczkę?")) return;
+      const it = getItemById(itemId);
+      if (!it) return;
+      it.a = (it.a || []).filter(x => x.id !== paymentId);
+      saveState();
+      renderItemPaymentsList();
+      update();
+    }
+
+    function openEditItemPayment(itemId, paymentId) {
+      const it = getItemById(itemId);
+      if (!it) return;
+      const p = (it.a || []).find(x => x.id === paymentId);
+      if (!p) return;
+
+      editPaymentCtx = { mode: 'item', itemId, paymentId };
+
+      document.getElementById('editPayKindWrap').style.display = 'none';
+      document.getElementById('editPayDescWrap').style.display = 'none';
+      document.getElementById('editPayDate').value = p.d || '';
+      document.getElementById('editPayAmount').value = p.p ?? '';
+      document.getElementById('editPaymentModal').classList.add('active');
+    }
+
+    // --- PŁATNOŚCI OGÓLNE ---
+    function openGeneralPaymentsModal() {
+      document.getElementById('genPayDate').valueAsDate = new Date();
+      document.getElementById('genPayAmount').value = '';
+      document.getElementById('genPayKind').value = 'received';
+      document.getElementById('genPayDesc').value = '';
+      document.getElementById('generalPaymentsModal').classList.add('active');
+      renderGeneralPaymentsList();
+    }
+
+    function closeGeneralPaymentsModal() {
+      document.getElementById('generalPaymentsModal').classList.remove('active');
+    }
+
+    function addGeneralPayment(e) {
+      e.preventDefault();
+      const kind = document.getElementById('genPayKind').value;
+      const d = document.getElementById('genPayDate').value || new Date().toISOString().slice(0, 10);
+      const p = parseMoney(document.getElementById('genPayAmount').value);
+      const desc = (document.getElementById('genPayDesc').value || '').trim();
+      if (p === 0) { alert("⚠️ Wpisz kwotę!"); return; }
+
+      state.generalPayments.unshift({ id: Date.now(), kind, d, p, desc });
+
+      document.getElementById('genPayAmount').value = '';
+      saveState();
+      renderGeneralPaymentsList();
+      update();
+    }
+
+    function renderGeneralPaymentsList() {
+      const container = document.getElementById('generalPaymentsList');
+      container.innerHTML = (state.generalPayments || []).map(p => {
+        const kindLabel = p.kind === 'received' ? 'OTRZYMANE' : 'WPŁACONE';
+        return `
+          <div class="payment-item">
+            <div class="payment-item-content">
+              <span class="payment-item-date">${p.d || ''} • ${kindLabel}</span>
+              <span class="payment-item-desc">${(p.desc || '—').replaceAll('<','&lt;')}</span>
+              <span class="payment-item-amount">${(parseFloat(p.p)||0).toFixed(2)} zł</span>
+            </div>
+            <div class="payment-item-actions">
+              <button type="button" class="btn btn-edit" onclick="openEditGeneralPayment(${p.id})">✎</button>
+              ${userCanDelete ? `<button type="button" class="btn btn-del" onclick="delGeneralPayment(${p.id})">🗑️</button>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('') || '<p style="color:#8b949e;">Brak</p>';
+    }
+
+    function delGeneralPayment(id) {
+      if (!userCanDelete) { alert('Nie masz uprawnień do usuwania płatności.'); return; }
+      if (!confirm("Usunąć płatność ogólną?")) return;
+      state.generalPayments = (state.generalPayments || []).filter(x => x.id !== id);
+      saveState();
+      renderGeneralPaymentsList();
+      update();
+    }
+
+    function openEditGeneralPayment(paymentId) {
+      const p = (state.generalPayments || []).find(x => x.id === paymentId);
+      if (!p) return;
+
+      editPaymentCtx = { mode: 'general', paymentId };
+
+      document.getElementById('editPayKindWrap').style.display = 'flex';
+      document.getElementById('editPayDescWrap').style.display = 'flex';
+
+      document.getElementById('editPayKind').value = p.kind || 'received';
+      document.getElementById('editPayDesc').value = p.desc || '';
+      document.getElementById('editPayDate').value = p.d || '';
+      document.getElementById('editPayAmount').value = p.p ?? '';
+      document.getElementById('editPaymentModal').classList.add('active');
+    }
+
+    function closeEditPaymentModal() {
+      document.getElementById('editPaymentModal').classList.remove('active');
+      editPaymentCtx = null;
+    }
+
+    function saveEditPayment(e) {
+      e.preventDefault();
+      if (!editPaymentCtx) return;
+
+      const d = document.getElementById('editPayDate').value;
+      const amount = parseMoney(document.getElementById('editPayAmount').value);
+
+      if (editPaymentCtx.mode === 'item') {
+        const it = getItemById(editPaymentCtx.itemId);
+        if (!it) return;
+        const p = (it.a || []).find(x => x.id === editPaymentCtx.paymentId);
+        if (!p) return;
+        p.d = d;
+        p.p = amount;
+        saveState();
+        renderItemPaymentsList();
+        update();
+      } else {
+        const p = (state.generalPayments || []).find(x => x.id === editPaymentCtx.paymentId);
+        if (!p) return;
+        p.kind = document.getElementById('editPayKind').value;
+        p.desc = (document.getElementById('editPayDesc').value || '').trim();
+        p.d = d;
+        p.p = amount;
+        saveState();
+        renderGeneralPaymentsList();
+        update();
+      }
+
+      closeEditPaymentModal();
+    }
+
+    function getSortParams() {
+      const field = document.getElementById('sortField')?.value || 'date';
+      const dir = document.getElementById('sortDir')?.value || 'desc';
+      return { field, dir };
+    }
+
+    function compareItems(a, b, field, dir) {
+      let av, bv;
+      if (field === 'amount') {
+        av = getItemTotal(a);
+        bv = getItemTotal(b);
+      } else {
+        av = new Date(a.d).getTime();
+        bv = new Date(b.d).getTime();
+      }
+      const diff = av - bv;
+      return dir === 'asc' ? diff : -diff;
+    }
+
+    function update() {
+      saveState();
+
+      const bodyS = document.getElementById('listServices');
+      const bodyP = document.getElementById('listPayments');
+      bodyS.innerHTML = '';
+      bodyP.innerHTML = '';
+
+      let sP = 0;
+      let itemsPaidTotal = 0;
+      let itemsRemainingTotal = 0;
+
+      const generalReceivedTotal = sumPayments(state.generalPayments.filter(p => p.kind === 'received'));
+      const generalPaidTotal = sumPayments(state.generalPayments.filter(p => p.kind === 'paid'));
+
+      const { field, dir } = getSortParams();
+
+      const items = [...state.items].sort((a, b) => compareItems(a, b, field, dir));
+      items.forEach(i => {
+        const isOwn = i.type === 'own';
+        const adv = getItemAdvTotal(i);
+        const remaining = getItemRemaining(i);
+
+        if (!isOwn) {
+          sP += getItemTotal(i);
+          itemsPaidTotal += adv;
+          if (!i.forcePaid) itemsRemainingTotal += remaining;
+        }
+
+        const vehicle = formatVehicle(i);
+        const clientLine = i.clientLastName ? `<div style="margin-top:6px; font-size:13px; color:#8b949e;">Klient: <strong style="color:#e6edf3;">${i.clientLastName.replaceAll('<','&lt;')}</strong></div>` : '';
+
+        const servicesDesc = joinDescs(i.services);
+        const servicesTotal = getServicesTotal(i);
+
+        const partsDesc = joinDescs(i.parts);
+        const partsTotal = getPartsTotal(i);
+
+        bodyS.innerHTML += `<tr class="${isOwn ? 'row-own' : ''}">
+          <td class="no-print">
+            <button class="btn status-btn ${i.forcePaid ? 'status-paid' : 'status-unpaid'}" onclick="togglePaid(${i.id})">
+              ${i.forcePaid ? 'ZAPŁACONE' : 'DO ZAPŁATY'}
+            </button>
+          </td>
+          <td>${i.d || ''}</td>
+          <td>
+            <strong>${(servicesDesc === '—' ? 'Pozycja' : servicesDesc).replaceAll('<','&lt;')}</strong>
+            ${isOwn ? '<span style="font-size:10px;background:var(--own-work);padding:2px 6px;border-radius:3px;margin-left:8px;">PRYWATNE</span>' : ''}
+            ${clientLine}
+          </td>
+          <td>${vehicle}</td>
+
+          <td>${servicesDesc.replaceAll('<','&lt;')}</td>
+          <td style="font-weight:bold;">${servicesTotal.toFixed(2)} zł</td>
+
+          <td>${partsDesc.replaceAll('<','&lt;')}</td>
+          <td style="font-weight:bold;">${partsTotal.toFixed(2)} zł</td>
+
+          <td style="color:var(--neon-yellow); font-weight:bold;">${adv.toFixed(2)} zł</td>
+          <td style="color:${remaining <= 0 ? 'var(--neon-yellow)' : 'var(--neon-green)'}; font-weight:bold;">${remaining.toFixed(2)} zł</td>
+
+          <td class="no-print" style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn btn-adv-row" onclick="openItemPaymentsModal(${i.id})">💰 Zaliczki</button>
+            <button class="btn btn-edit" onclick="openEditModal(${i.id})">✎ Edytuj</button>
+            ${userCanDelete ? `<button class="btn btn-del" onclick="delItem(${i.id})">🗑️</button>` : ''}
+          </td>
+        </tr>`;
+      });
+
+      const gps = [...state.generalPayments].sort((a, b) => new Date(b.d) - new Date(a.d));
+      if (gps.length === 0) {
+        bodyP.innerHTML = `<tr><td colspan="5" style="color:#8b949e;">Brak płatności ogólnych</td></tr>`;
+      } else {
+        gps.forEach(gp => {
+          const label = gp.kind === 'received' ? 'OTRZYMANE' : 'WPŁACONE';
+          const signForBalance = gp.kind === 'received' ? '-' : '+';
+          bodyP.innerHTML += `<tr>
+            <td><strong>${label}</strong></td>
+            <td>${gp.d || ''}</td>
+            <td>${(gp.desc || '—').replaceAll('<','&lt;')}</td>
+            <td style="color:var(--neon-yellow); font-weight:bold;">${signForBalance}${(parseFloat(gp.p)||0).toFixed(2)} zł</td>
+            <td class="no-print" style="display:flex; gap:5px;">
+              <button class="btn btn-edit" onclick="openEditGeneralPayment(${gp.id})">✎</button>
+              <button class="btn btn-del" onclick="delGeneralPayment(${gp.id})">🗑️</button>
+            </td>
+          </tr>`;
+        });
+      }
+
+      const sA = itemsPaidTotal + generalReceivedTotal;
+      const final = itemsRemainingTotal - generalReceivedTotal + generalPaidTotal;
+
+      document.getElementById('sP').innerText = sP.toFixed(2) + " zł";
+      document.getElementById('sA').innerText = sA.toFixed(2) + " zł";
+
+      const fD = document.getElementById('fD');
+      fD.innerText = final.toFixed(2) + " zł";
+      fD.style.color = final > 0 ? "var(--neon-green)" : (final < 0 ? "var(--neon-yellow)" : "white");
+
+      updateStats();
+    }
+
+    // --- STATYSTYKI ---
+    function initStatsFilters() {
+      const mSel = document.getElementById('statMonth');
+      const ySel = document.getElementById('statYear');
+      const now = new Date();
+      mSel.innerHTML = "";
+      ySel.innerHTML = "";
+
+      plMonths.forEach((m, i) => {
+        const opt = new Option(m, i);
+        if (i === now.getMonth()) opt.selected = true;
+        mSel.add(opt);
+      });
+
+      for (let y = 2024; y <= now.getFullYear() + 2; y++) {
+        const opt = new Option(y, y);
+        if (y === now.getFullYear()) opt.selected = true;
+        ySel.add(opt);
+      }
+    }
+
+    function unlockStats() {
+      if (prompt("Podaj hasło:") === SECRET_PASSWORD) {
+        document.getElementById('statsContainer').style.display = 'block';
+        document.getElementById('unlockBtn').style.display = 'none';
+        updateStats();
+      } else {
+        alert("Błędne hasło!");
+      }
+    }
+
+    function lockStats() {
+      document.getElementById('statsContainer').style.display = 'none';
+      document.getElementById('unlockBtn').style.display = 'flex';
+    }
+
+    function updateStats() {
+      if (document.getElementById('statsContainer').style.display === 'none') return;
+
+      const selM = parseInt(document.getElementById('statMonth').value);
+      const selY = parseInt(document.getElementById('statYear').value);
+
+      const monthItems = state.items.filter(i => {
+        const d = new Date(i.d);
+        return d.getMonth() === selM && d.getFullYear() === selY;
+      });
+
+      const allPaid = monthItems.length > 0 && monthItems.every(i => i.forcePaid);
+      let mClient = 0, mOwn = 0;
+
+      // statystyki: tylko suma usług (robocizna) - bez części
+      if (allPaid) {
+        monthItems.forEach(i => {
+          if (i.type === 'own') mOwn += getServicesTotal(i);
+          else mClient += getServicesTotal(i);
+        });
+      }
+
+      document.getElementById('stClient').innerText = mClient.toFixed(2) + " zł";
+      document.getElementById('stOwn').innerText = mOwn.toFixed(2) + " zł";
+      document.getElementById('stTotal').innerText = (mClient + mOwn).toFixed(2) + " zł";
+    }
+  </script>
+</body>
+</html>
