@@ -362,10 +362,8 @@ script:
             }
           }
 
-          float calkowita_nadwyzka_w = chwilowy_bilans_sieci_w + moc_grzalki_w + moc_banku_w;
-
-          if (calkowita_nadwyzka_w > 1400.0f && aktualny_prog < 100.0f) {
-            ESP_LOGW("MAX_POWER", "Nadwyzka systemu %.0fW. Ustawiam pelna moc.", calkowita_nadwyzka_w);
+          if (dostepna_moc_grzalki_w > 1400.0f && aktualny_prog < 100.0f) {
+            ESP_LOGW("MAX_POWER", "Siec=%.0fW bank=%.0fW grzalka=%.0fW dostepne=%.0fW. Ustawiam pelna moc.", id(grid_power_wartosc), moc_banku_w, moc_grzalki_w, dostepna_moc_grzalki_w);
             id(grzalka_moc).publish_state(100.0f);
             id(grzalka_pwm).set_level(1.0f);
             id(led_pwm).set_level(1.0f);
