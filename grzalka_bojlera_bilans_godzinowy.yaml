@@ -150,7 +150,7 @@ globals:
   - id: docelowy_export_w
     type: float
     restore_value: no
-    initial_value: '200.0'
+    initial_value: '300.0'
   - id: auto_wylaczone_przez_termostat
     type: bool
     restore_value: no
@@ -475,8 +475,7 @@ text_sensor:
       }
 
       float wymagany_bufor_wh = id(bufor_startu_grzalki_wh) + id(rezerwa_exportu_godzinowego_wh);
-      if (id(tryb_auto).state && !id(grzalka_auto_start_w_godzinie) &&
-          id(bilans_godzinowy_wh) < wymagany_bufor_wh) {
+      if (!id(grzalka_auto_start_w_godzinie) && id(bilans_godzinowy_wh) < wymagany_bufor_wh) {
         return std::string("Zbieram bufor");
       }
 
