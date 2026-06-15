@@ -14,7 +14,7 @@ Założenia:
 - częstsze odczyty PV korygują ostatni pomiar mocy sieci o zmianę PV i mocy grzałki; szybka reakcja PV służy do cięcia mocy tylko przy większym niedoborze, a zwiększanie mocy zostaje w głównej pętli bilansowania,
 - zwiększanie mocy w AUTO jest limitowane krokami, żeby wolniejszy odczyt licznika sieci zdążył potwierdzić realny wpływ grzałki,
 - kolejne zwiększenie mocy jest wstrzymywane do czasu odczytu mocy sieci nowszego niż ostatnia zmiana grzałki oraz 60 sekund stabilizacji po tej zmianie,
-- osiągnięcie albo przekroczenie zadanej temperatury CWU natychmiast wyłącza grzałkę oraz tryby AUTO/MANUAL,
+- osiągnięcie albo przekroczenie zadanej temperatury CWU oraz obniżenie nastawy poniżej aktualnej temperatury natychmiast wyłącza grzałkę oraz tryby AUTO/MANUAL,
 - `Bilans godzinowy moc banku` to moc, którą sterownik może dodatkowo wykorzystać, żeby do końca godziny zejść z bilansem możliwie blisko zera.
 
 Przed wgraniem dodaj do `secrets.yaml`:

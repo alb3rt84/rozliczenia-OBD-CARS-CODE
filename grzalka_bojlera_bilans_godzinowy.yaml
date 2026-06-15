@@ -167,7 +167,31 @@ number:
     initial_value: 60
     restore_value: true
     on_value:
-      - script.execute: reakcja_na_suwak_temp
+      - lambda: |-
+          float t_wody = id(temp_cwu_ha).state;
+          if (std::isnan(t_wody)) t_wody = id(temp_cwu_wartosc);
+
+          if (std::isnan(t_wody)) {
+            ESP_LOGE("SUWAK", "Brak poprawnego odczytu temperatury CWU po zmianie nastawy na %.0fC. Wylaczam grzalke i tryby pracy.", x);
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+            return;
+          }
+
+          id(temp_cwu_wartosc) = t_wody;
+          if (t_wody >= x) {
+            ESP_LOGE("SUWAK", "Nastawa %.0fC <= woda %.1fC. Wylaczam grzalke i tryby pracy.", x, t_wody);
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+          } else {
+            ESP_LOGD("SUWAK", "Nastawa %.0fC > woda %.1fC. Nie zmieniam trybu pracy.", x, t_wody);
+          }
 
 # -- Sensory ---------------------------------------------------------------
 sensor:
@@ -332,17 +356,25 @@ script:
     then:
       - lambda: |-
           float t_max = id(temp_max_ustawienie).state;
-          float t_wody = id(temp_cwu_wartosc);
+          float t_wody = id(temp_cwu_ha).state;
+          if (std::isnan(t_wody)) t_wody = id(temp_cwu_wartosc);
 
-          if (!std::isnan(t_wody) && t_wody >= t_max) {
+          if (std::isnan(t_wody)) {
+            ESP_LOGE("SUWAK", "Brak poprawnego odczytu temperatury CWU. Wylaczam grzalke i tryby pracy.");
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+          } else if (!std::isnan(t_max) && t_wody >= t_max) {
             ESP_LOGE("SUWAK", "Zmniejszono nastawe! Woda (%.1fC) >= Nastawa (%.0fC). Wylaczam sterowanie.", t_wody, t_max);
             id(tryb_auto).turn_off();
             id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
           } else {
-            if (!id(tryb_auto).state) {
-              ESP_LOGW("SUWAK", "Temperatura bezpieczna. Aktywuje domyslny Tryb AUTO (PV).");
-              id(tryb_auto).turn_on();
-            }
+            ESP_LOGD("SUWAK", "Temperatura bezpieczna. Nie zmieniam trybu pracy.");
           }
 
   - id: szybka_reakcja_pv
@@ -350,7 +382,16 @@ script:
     then:
       - lambda: |-
           if (!id(tryb_auto).state) return;
-          if (id(temp_cwu_wartosc) >= id(temp_max_ustawienie).state) return;
+          if (!std::isnan(id(temp_cwu_wartosc)) && !std::isnan(id(temp_max_ustawienie).state) &&
+              id(temp_cwu_wartosc) >= id(temp_max_ustawienie).state) {
+            ESP_LOGE("TERMOSTAT", "Temperatura CWU %.1fC >= nastawa %.0fC podczas szybkiej reakcji. Wylaczam grzalke i tryby pracy.", id(temp_cwu_wartosc), id(temp_max_ustawienie).state);
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+            return;
+          }
 
           float prod_pv = id(pv_power_wartosc);
           float aktualny_prog = id(grzalka_moc).state;
