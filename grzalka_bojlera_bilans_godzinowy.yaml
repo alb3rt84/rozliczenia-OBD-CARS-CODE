@@ -336,11 +336,14 @@ script:
           if (std::isnan(prod_pv)) return;
 
           float moc_grzalki_w = (aktualny_prog / 100.0f) * 1500.0f;
+          float dostepna_moc_grzalki_w = moc_grzalki_w + chwilowy_bilans_sieci_w + moc_banku_w;
+          if (dostepna_moc_grzalki_w < 0.0f) dostepna_moc_grzalki_w = 0.0f;
+          if (dostepna_moc_grzalki_w > 1500.0f) dostepna_moc_grzalki_w = 1500.0f;
 
-          // Przy bilansowaniu godzinowym grzalka moze korzystac nie tylko z PV,
-          // ale tez z dodatniego banku energii w aktualnej godzinie.
-          if (aktualny_prog > 0.0f && prod_pv + moc_banku_w < moc_grzalki_w) {
-            float wolna_moc = prod_pv + moc_banku_w - 20.0f;
+          // Przy bilansowaniu godzinowym grzalka moze korzystac z chwilowej nadwyzki sieci
+          // oraz dodatniego banku energii, ale reaguje od razu na realny pobor z sieci.
+          if (aktualny_prog > 0.0f && dostepna_moc_grzalki_w + 20.0f < moc_grzalki_w) {
+            float wolna_moc = dostepna_moc_grzalki_w - 20.0f;
             if (wolna_moc < 0.0f) wolna_moc = 0.0f;
 
             float nowy_prog = (wolna_moc / 1500.0f) * 100.0f;
@@ -352,17 +355,15 @@ script:
             if (nowy_prog < 0.0f) nowy_prog = 0.0f;
 
             if (nowy_prog != aktualny_prog) {
-              ESP_LOGE("BEZPIECZNIK", "Szybkie ciecie. PV=%.0fW + bank=%.0fW < grzalka=%.0fW. Ustawiam %.0f%%", prod_pv, moc_banku_w, moc_grzalki_w, nowy_prog);
+              ESP_LOGE("BEZPIECZNIK", "Szybkie ciecie. Siec=%.0fW bank=%.0fW grzalka=%.0fW dostepne=%.0fW. Ustawiam %.0f%%", id(grid_power_wartosc), moc_banku_w, moc_grzalki_w, dostepna_moc_grzalki_w, nowy_prog);
               id(grzalka_moc).publish_state(nowy_prog);
               id(grzalka_pwm).set_level(nowy_prog / 100.0f);
               id(led_pwm).set_level(nowy_prog / 100.0f);
             }
           }
 
-          float calkowita_nadwyzka_w = chwilowy_bilans_sieci_w + moc_grzalki_w + moc_banku_w;
-
-          if (calkowita_nadwyzka_w > 1400.0f && aktualny_prog < 100.0f) {
-            ESP_LOGW("MAX_POWER", "Nadwyzka systemu %.0fW. Ustawiam pelna moc.", calkowita_nadwyzka_w);
+          if (dostepna_moc_grzalki_w > 1400.0f && aktualny_prog < 100.0f) {
+            ESP_LOGW("MAX_POWER", "Siec=%.0fW bank=%.0fW grzalka=%.0fW dostepne=%.0fW. Ustawiam pelna moc.", id(grid_power_wartosc), moc_banku_w, moc_grzalki_w, dostepna_moc_grzalki_w);
             id(grzalka_moc).publish_state(100.0f);
             id(grzalka_pwm).set_level(1.0f);
             id(led_pwm).set_level(1.0f);
@@ -371,12 +372,12 @@ script:
           condition:
             lambda: |-
               if (!id(tryb_auto).state) return false;
-              float prod_pv = id(pv_power_wartosc);
               float aktualny_prog = id(grzalka_moc).state;
               float moc_grzalki_w = (aktualny_prog / 100.0f) * 1500.0f;
               float chwilowy_bilans_sieci_w = -id(grid_power_wartosc);
               float moc_banku_w = id(moc_banku_godzinowego_w);
-              return (prod_pv + moc_banku_w < moc_grzalki_w) || (chwilowy_bilans_sieci_w + moc_grzalki_w + moc_banku_w > 1400.0f);
+              float dostepna_moc_grzalki_w = moc_grzalki_w + chwilowy_bilans_sieci_w + moc_banku_w;
+              return (dostepna_moc_grzalki_w + 20.0f < moc_grzalki_w) || (dostepna_moc_grzalki_w > 1400.0f);
           then:
             - script.stop: regulacja_auto
 
@@ -472,43 +473,28 @@ script:
             return;
           }
 
-          float prod_pv = id(pv_power_wartosc);
-          if (std::isnan(prod_pv)) {
-            ESP_LOGD("AUTO", "Oczekiwanie na poprawna moc PV z Home Assistant...");
-            return;
-          }
-
           float aktualny_prog = id(grzalka_moc).state;
           float nowy_prog = aktualny_prog;
 
-          if (aktualny_prog == 0.0f && prod_pv <= 120.0f && moc_z_banku_w < 200.0f) {
+          float moc_grzalki_w = (aktualny_prog / 100.0f) * 1500.0f;
+          float chwilowy_bilans_sieci_w = -id(grid_power_wartosc);
+          float dostepna_moc_grzalki_w = moc_grzalki_w + chwilowy_bilans_sieci_w + moc_z_banku_w;
+          if (dostepna_moc_grzalki_w < 0.0f) dostepna_moc_grzalki_w = 0.0f;
+          if (dostepna_moc_grzalki_w > 1500.0f) dostepna_moc_grzalki_w = 1500.0f;
+
+          if (aktualny_prog == 0.0f && dostepna_moc_grzalki_w < 200.0f) {
             return;
           }
 
-          float moc_grzalki_w = (aktualny_prog / 100.0f) * 1500.0f;
-
-          float calkowita_nadwyzka_w = realny_bilans_sieci_w + moc_grzalki_w + moc_z_banku_w;
-          if (calkowita_nadwyzka_w > 1400.0f) {
+          if (dostepna_moc_grzalki_w > 1400.0f) {
             id(grzalka_moc).publish_state(100.0f);
             id(grzalka_pwm).set_level(1.0f);
             id(led_pwm).set_level(1.0f);
-            ESP_LOGW("BILANS_H", "Pelna moc. Okno=%.0fW bank=%.0fW bilans_h=%.0fWh", realny_bilans_sieci_w, moc_z_banku_w, id(bilans_godzinowy_wh));
+            ESP_LOGW("BILANS_H", "Pelna moc. Siec=%.0fW okno=%.0fW bank=%.0fW bilans_h=%.0fWh", id(grid_power_wartosc), realny_bilans_sieci_w, moc_z_banku_w, id(bilans_godzinowy_wh));
             return;
           }
 
-          if (aktualny_prog == 0.0f) {
-            float chwilowa_nadwyzka = -id(grid_power_wartosc);
-            float dostepna_moc = chwilowa_nadwyzka + moc_z_banku_w;
-            if (dostepna_moc >= 200.0f && (prod_pv > 150.0f || moc_z_banku_w >= 200.0f)) {
-              nowy_prog = 15.0f;
-              ESP_LOGW("AUTO_START", "Start od 15%%. Chwilowo=%.0fW bank=%.0fW bilans_h=%.0fWh", chwilowa_nadwyzka, moc_z_banku_w, id(bilans_godzinowy_wh));
-            }
-          } else {
-            float wolna_moc_dla_grzalki_w = moc_grzalki_w + realny_bilans_sieci_w + moc_z_banku_w;
-            if (wolna_moc_dla_grzalki_w < 0.0f) wolna_moc_dla_grzalki_w = 0.0f;
-
-            nowy_prog = (wolna_moc_dla_grzalki_w / 1500.0f) * 100.0f;
-          }
+          nowy_prog = (dostepna_moc_grzalki_w / 1500.0f) * 100.0f;
 
           nowy_prog = std::round(nowy_prog / 5.0f) * 5.0f;
 
@@ -520,7 +506,7 @@ script:
           if (nowy_prog > 100.0f) nowy_prog = 100.0f;
           if (nowy_prog < 0.0f) nowy_prog = 0.0f;
 
-          ESP_LOGW("BILANS_H", "Okno30s=%.0fW | bilans_h=%.0fWh | bank=%.0fW | cel=%.0f%%", realny_bilans_sieci_w, id(bilans_godzinowy_wh), moc_z_banku_w, nowy_prog);
+          ESP_LOGW("BILANS_H", "Siec=%.0fW | chwilowo=%.0fW | Okno30s=%.0fW | bilans_h=%.0fWh | bank=%.0fW | dostepne=%.0fW | cel=%.0f%%", id(grid_power_wartosc), chwilowy_bilans_sieci_w, realny_bilans_sieci_w, id(bilans_godzinowy_wh), moc_z_banku_w, dostepna_moc_grzalki_w, nowy_prog);
 
           if (nowy_prog != aktualny_prog) {
             id(grzalka_moc).publish_state(nowy_prog);

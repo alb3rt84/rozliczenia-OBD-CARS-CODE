@@ -10,6 +10,7 @@ Założenia:
 - na początku każdej godziny zapamiętywany jest stan liczników,
 - dodatni `Bilans godzinowy energia` oznacza nadwyżkę oddaną do sieci w aktualnej godzinie,
 - licznik bilansowania działa także przy wyłączonym trybie AUTO oraz w trybie MANUAL,
+- tryb AUTO dobiera moc grzałki z bieżącego bilansu sieci oraz banku godzinowego, żeby nie zwiększać mocy przy aktualnym poborze z sieci,
 - `Bilans godzinowy moc banku` to moc, którą sterownik może dodatkowo wykorzystać, żeby do końca godziny zejść z bilansem możliwie blisko zera.
 
 Przed wgraniem dodaj do `secrets.yaml`:
