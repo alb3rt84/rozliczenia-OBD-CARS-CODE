@@ -370,6 +370,7 @@ script:
       - if:
           condition:
             lambda: |-
+              if (!id(tryb_auto).state) return false;
               float prod_pv = id(pv_power_wartosc);
               float aktualny_prog = id(grzalka_moc).state;
               float moc_grzalki_w = (aktualny_prog / 100.0f) * 1500.0f;
