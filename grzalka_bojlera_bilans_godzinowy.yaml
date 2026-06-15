@@ -287,6 +287,9 @@ sensor:
             id(grzalka_moc).publish_state(0.0f);
             id(grzalka_pwm).set_level(0.0f);
             id(led_pwm).set_level(0.0f);
+          } else if (!std::isnan(t_max) && x < t_max && !id(tryb_auto).state) {
+            ESP_LOGW("TERMOSTAT", "Temperatura CWU %.1fC spadla ponizej nastawy %.0fC. Wlaczam AUTO.", x, t_max);
+            id(tryb_auto).turn_on();
           }
 
   - platform: homeassistant
@@ -309,6 +312,9 @@ sensor:
             id(grzalka_moc).publish_state(0.0f);
             id(grzalka_pwm).set_level(0.0f);
             id(led_pwm).set_level(0.0f);
+          } else if (!std::isnan(t_max) && x < t_max && !id(tryb_auto).state) {
+            ESP_LOGW("TERMOSTAT", "Temperatura CWU %.1fC spadla ponizej nastawy %.0fC. Wlaczam AUTO.", x, t_max);
+            id(tryb_auto).turn_on();
           }
 
   - platform: homeassistant
@@ -331,6 +337,9 @@ sensor:
             id(grzalka_moc).publish_state(0.0f);
             id(grzalka_pwm).set_level(0.0f);
             id(led_pwm).set_level(0.0f);
+          } else if (!std::isnan(t_max) && x < t_max && !id(tryb_auto).state) {
+            ESP_LOGW("TERMOSTAT", "Temperatura CWU %.1fC spadla ponizej nastawy %.0fC. Wlaczam AUTO.", x, t_max);
+            id(tryb_auto).turn_on();
           }
 
   - platform: homeassistant
@@ -353,6 +362,9 @@ sensor:
             id(grzalka_moc).publish_state(0.0f);
             id(grzalka_pwm).set_level(0.0f);
             id(led_pwm).set_level(0.0f);
+          } else if (!std::isnan(t_max) && x < t_max && !id(tryb_auto).state) {
+            ESP_LOGW("TERMOSTAT", "Temperatura CWU %.1fC spadla ponizej nastawy %.0fC. Wlaczam AUTO.", x, t_max);
+            id(tryb_auto).turn_on();
           }
 
   - platform: template
