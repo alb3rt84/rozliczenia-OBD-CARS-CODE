@@ -142,7 +142,7 @@ globals:
   - id: bufor_startu_grzalki_wh
     type: float
     restore_value: no
-    initial_value: '30.0'
+    initial_value: '60.0'
   - id: rezerwa_exportu_godzinowego_wh
     type: float
     restore_value: no

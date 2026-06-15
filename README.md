@@ -18,7 +18,7 @@ Założenia:
 - spadek temperatury CWU poniżej nastawy z suwaka automatycznie włącza tryb AUTO tylko wtedy, gdy AUTO zostało wcześniej wyłączone przez termostat,
 - tryb AUTO, MANUAL i ręczne ustawienie mocy grzałki są blokowane przez termostat oraz brak potwierdzonego, rzeczywistego odczytu temperatury,
 - konfiguracja próbuje odczytać temperaturę CWU z kilku popularnych `entity_id`; działający odczyt jest widoczny w logu `TERMOSTAT`,
-- bufor energii przed pierwszym startem w godzinie zbiera się także przy wyłączonym AUTO, a bank godzinowy zostawia małą rezerwę eksportu zamiast zużywać cały bilans,
+- bufor energii przed pierwszym startem w godzinie zbiera się także przy wyłączonym AUTO; pierwszy start wymaga około `70 Wh` dodatniego bilansu (`60 Wh` bufora + `10 Wh` rezerwy eksportu),
 - regulacja AUTO zostawia docelowo około `300 W` eksportu jako margines bezpieczeństwa, zamiast dążyć do zera bilansu,
 - uproszczone nazwy sensorów bilansu: `Bilans godziny`, `Moc chwilowa 30s`, `Dostępna moc z bufora` oraz tekstowy `Status bilansu grzałki`,
 - `Bilans godzinowy moc banku` to moc, którą sterownik może dodatkowo wykorzystać, żeby do końca godziny zejść z bilansem możliwie blisko zera.
