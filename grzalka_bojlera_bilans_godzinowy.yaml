@@ -277,6 +277,72 @@ sensor:
             id(led_pwm).set_level(0.0f);
           }
 
+  - platform: homeassistant
+    id: temp_cwu_ha_alt_defro
+    entity_id: sensor.defro_pelet_temperatura_c_w_u
+    on_value:
+      - lambda: |-
+          if (std::isnan(x)) return;
+
+          id(temp_cwu_wartosc) = x;
+          id(temp_cwu_ma_odczyt) = true;
+          ESP_LOGD("TERMOSTAT", "Odczyt temperatury CWU z alternatywnej encji Defro: %.1fC", x);
+
+          float t_max = id(temp_max_ustawienie).state;
+          if (!std::isnan(t_max) && x >= t_max &&
+              (id(tryb_auto).state || id(tryb_manual).state || id(grzalka_moc).state > 0.0f)) {
+            ESP_LOGE("TERMOSTAT", "Bojler osiagnal zadana temperature (%.1fC >= %.0fC). Wylaczam grzalke i tryby pracy!", x, t_max);
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+          }
+
+  - platform: homeassistant
+    id: temp_cwu_ha_alt_short
+    entity_id: sensor.temperatura_c_w_u
+    on_value:
+      - lambda: |-
+          if (std::isnan(x)) return;
+
+          id(temp_cwu_wartosc) = x;
+          id(temp_cwu_ma_odczyt) = true;
+          ESP_LOGD("TERMOSTAT", "Odczyt temperatury CWU z encji sensor.temperatura_c_w_u: %.1fC", x);
+
+          float t_max = id(temp_max_ustawienie).state;
+          if (!std::isnan(t_max) && x >= t_max &&
+              (id(tryb_auto).state || id(tryb_manual).state || id(grzalka_moc).state > 0.0f)) {
+            ESP_LOGE("TERMOSTAT", "Bojler osiagnal zadana temperature (%.1fC >= %.0fC). Wylaczam grzalke i tryby pracy!", x, t_max);
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+          }
+
+  - platform: homeassistant
+    id: temp_cwu_ha_alt_compact
+    entity_id: sensor.temperatura_cwu
+    on_value:
+      - lambda: |-
+          if (std::isnan(x)) return;
+
+          id(temp_cwu_wartosc) = x;
+          id(temp_cwu_ma_odczyt) = true;
+          ESP_LOGD("TERMOSTAT", "Odczyt temperatury CWU z encji sensor.temperatura_cwu: %.1fC", x);
+
+          float t_max = id(temp_max_ustawienie).state;
+          if (!std::isnan(t_max) && x >= t_max &&
+              (id(tryb_auto).state || id(tryb_manual).state || id(grzalka_moc).state > 0.0f)) {
+            ESP_LOGE("TERMOSTAT", "Bojler osiagnal zadana temperature (%.1fC >= %.0fC). Wylaczam grzalke i tryby pracy!", x, t_max);
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+          }
+
   - platform: template
     name: "Moc sieci Waty"
     id: moc_sieci_waty
