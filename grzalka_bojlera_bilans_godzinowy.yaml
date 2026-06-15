@@ -402,7 +402,7 @@ sensor:
     update_interval: 5s
 
   - platform: template
-    name: "Bilans godzinowy energia"
+    name: "Bilans godziny"
     id: bilans_godzinowy_energia
     unit_of_measurement: "Wh"
     accuracy_decimals: 0
@@ -412,7 +412,7 @@ sensor:
     update_interval: 30s
 
   - platform: template
-    name: "Bilans godzinowy moc banku"
+    name: "Dostępna moc z bufora"
     id: bilans_godzinowy_moc_banku
     unit_of_measurement: "W"
     device_class: power
@@ -424,7 +424,7 @@ sensor:
     update_interval: 30s
 
   - platform: template
-    name: "Bilans godzinowy moc 30s"
+    name: "Moc chwilowa 30s"
     id: bilans_godzinowy_moc_okna
     unit_of_measurement: "W"
     device_class: power
@@ -434,6 +434,42 @@ sensor:
     lambda: |-
       return id(srednia_moc_okna_w);
     update_interval: 30s
+
+text_sensor:
+  - platform: template
+    name: "Status bilansu grzałki"
+    id: status_bilansu_grzalki
+    icon: "mdi:information-outline"
+    lambda: |-
+      if (!id(temp_cwu_ma_odczyt)) {
+        return std::string("Brak temperatury CWU");
+      }
+
+      float t_max = id(temp_max_ustawienie).state;
+      if (!std::isnan(t_max) && id(temp_cwu_wartosc) >= t_max) {
+        return std::string("Temperatura osiągnięta");
+      }
+
+      if (id(grid_power_wartosc) > 50.0f) {
+        return std::string("Pobór z sieci");
+      }
+
+      float wymagany_bufor_wh = id(bufor_startu_grzalki_wh) + id(rezerwa_exportu_godzinowego_wh);
+      if (id(tryb_auto).state && !id(grzalka_auto_start_w_godzinie) &&
+          id(bilans_godzinowy_wh) < wymagany_bufor_wh) {
+        return std::string("Zbieram bufor");
+      }
+
+      if (id(grzalka_moc).state > 0.0f) {
+        return std::string("Grzanie");
+      }
+
+      if (id(moc_banku_godzinowego_w) > 0.0f || id(grid_power_wartosc) < -50.0f) {
+        return std::string("Można grzać");
+      }
+
+      return std::string("Czekam na nadwyżkę");
+    update_interval: 10s
 
 # -- Przelaczniki trybow ---------------------------------------------------
 switch:
