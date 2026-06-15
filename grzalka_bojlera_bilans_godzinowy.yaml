@@ -364,8 +364,8 @@ script:
 
           // Przy bilansowaniu godzinowym grzalka moze korzystac z chwilowej nadwyzki sieci
           // oraz dodatniego banku energii, ale reaguje od razu na realny pobor z sieci.
-          if (aktualny_prog > 0.0f && dostepna_moc_grzalki_w + 20.0f < moc_grzalki_w) {
-            float wolna_moc = dostepna_moc_grzalki_w - 20.0f;
+          if (aktualny_prog > 0.0f && dostepna_moc_grzalki_w + 100.0f < moc_grzalki_w) {
+            float wolna_moc = dostepna_moc_grzalki_w - 50.0f;
             if (wolna_moc < 0.0f) wolna_moc = 0.0f;
 
             float nowy_prog = (wolna_moc / 1500.0f) * 100.0f;
@@ -402,7 +402,7 @@ script:
               float chwilowy_bilans_sieci_w = -skorygowana_moc_sieci_w;
               float moc_banku_w = id(moc_banku_godzinowego_w);
               float dostepna_moc_grzalki_w = moc_grzalki_w + chwilowy_bilans_sieci_w + moc_banku_w;
-              return dostepna_moc_grzalki_w + 20.0f < moc_grzalki_w;
+              return dostepna_moc_grzalki_w + 100.0f < moc_grzalki_w;
           then:
             - script.stop: regulacja_auto
 
