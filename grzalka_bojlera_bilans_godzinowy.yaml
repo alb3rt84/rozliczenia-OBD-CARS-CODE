@@ -135,6 +135,18 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+  - id: grzalka_auto_start_w_godzinie
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: bufor_startu_grzalki_wh
+    type: float
+    restore_value: no
+    initial_value: '30.0'
+  - id: rezerwa_exportu_godzinowego_wh
+    type: float
+    restore_value: no
+    initial_value: '10.0'
 
 # -- Suwaki ----------------------------------------------------------------
 number:
@@ -268,6 +280,72 @@ sensor:
           id(temp_cwu_ma_odczyt) = true;
           float t_max = id(temp_max_ustawienie).state;
           if (!std::isnan(x) && !std::isnan(t_max) && x >= t_max &&
+              (id(tryb_auto).state || id(tryb_manual).state || id(grzalka_moc).state > 0.0f)) {
+            ESP_LOGE("TERMOSTAT", "Bojler osiagnal zadana temperature (%.1fC >= %.0fC). Wylaczam grzalke i tryby pracy!", x, t_max);
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+          }
+
+  - platform: homeassistant
+    id: temp_cwu_ha_alt_defro
+    entity_id: sensor.defro_pelet_temperatura_c_w_u
+    on_value:
+      - lambda: |-
+          if (std::isnan(x)) return;
+
+          id(temp_cwu_wartosc) = x;
+          id(temp_cwu_ma_odczyt) = true;
+          ESP_LOGD("TERMOSTAT", "Odczyt temperatury CWU z alternatywnej encji Defro: %.1fC", x);
+
+          float t_max = id(temp_max_ustawienie).state;
+          if (!std::isnan(t_max) && x >= t_max &&
+              (id(tryb_auto).state || id(tryb_manual).state || id(grzalka_moc).state > 0.0f)) {
+            ESP_LOGE("TERMOSTAT", "Bojler osiagnal zadana temperature (%.1fC >= %.0fC). Wylaczam grzalke i tryby pracy!", x, t_max);
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+          }
+
+  - platform: homeassistant
+    id: temp_cwu_ha_alt_short
+    entity_id: sensor.temperatura_c_w_u
+    on_value:
+      - lambda: |-
+          if (std::isnan(x)) return;
+
+          id(temp_cwu_wartosc) = x;
+          id(temp_cwu_ma_odczyt) = true;
+          ESP_LOGD("TERMOSTAT", "Odczyt temperatury CWU z encji sensor.temperatura_c_w_u: %.1fC", x);
+
+          float t_max = id(temp_max_ustawienie).state;
+          if (!std::isnan(t_max) && x >= t_max &&
+              (id(tryb_auto).state || id(tryb_manual).state || id(grzalka_moc).state > 0.0f)) {
+            ESP_LOGE("TERMOSTAT", "Bojler osiagnal zadana temperature (%.1fC >= %.0fC). Wylaczam grzalke i tryby pracy!", x, t_max);
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+          }
+
+  - platform: homeassistant
+    id: temp_cwu_ha_alt_compact
+    entity_id: sensor.temperatura_cwu
+    on_value:
+      - lambda: |-
+          if (std::isnan(x)) return;
+
+          id(temp_cwu_wartosc) = x;
+          id(temp_cwu_ma_odczyt) = true;
+          ESP_LOGD("TERMOSTAT", "Odczyt temperatury CWU z encji sensor.temperatura_cwu: %.1fC", x);
+
+          float t_max = id(temp_max_ustawienie).state;
+          if (!std::isnan(t_max) && x >= t_max &&
               (id(tryb_auto).state || id(tryb_manual).state || id(grzalka_moc).state > 0.0f)) {
             ESP_LOGE("TERMOSTAT", "Bojler osiagnal zadana temperature (%.1fC >= %.0fC). Wylaczam grzalke i tryby pracy!", x, t_max);
             id(tryb_auto).turn_off();
@@ -552,6 +630,7 @@ script:
             id(bilans_godzinowy_wh) = 0.0f;
             id(srednia_moc_okna_w) = 0.0f;
             id(moc_banku_godzinowego_w) = 0.0f;
+            id(grzalka_auto_start_w_godzinie) = false;
             id(bilans_zainicjowany) = true;
             ESP_LOGW("BILANS_H", "Start/reset bilansu godzinowego: %s | import=%.3fkWh export=%.3fkWh", powod, c_import, c_export);
           };
@@ -600,8 +679,9 @@ script:
           }
 
           float moc_z_banku_w = 0.0f;
-          if (id(bilans_godzinowy_wh) > 5.0f) {
-            moc_z_banku_w = (id(bilans_godzinowy_wh) * 3600.0f) / pozostalo_s;
+          float bilans_do_wykorzystania_wh = id(bilans_godzinowy_wh) - id(rezerwa_exportu_godzinowego_wh);
+          if (bilans_do_wykorzystania_wh > 5.0f) {
+            moc_z_banku_w = (bilans_do_wykorzystania_wh * 3600.0f) / pozostalo_s;
             if (moc_z_banku_w > 1500.0f) moc_z_banku_w = 1500.0f;
           }
           id(moc_banku_godzinowego_w) = moc_z_banku_w;
@@ -651,6 +731,13 @@ script:
             return;
           }
 
+          float wymagany_bufor_przed_startem_wh = id(bufor_startu_grzalki_wh) + id(rezerwa_exportu_godzinowego_wh);
+          if (aktualny_prog == 0.0f && !id(grzalka_auto_start_w_godzinie) &&
+              id(bilans_godzinowy_wh) < wymagany_bufor_przed_startem_wh) {
+            ESP_LOGD("BILANS_H", "Zbieram bufor przed pierwszym startem grzalki: bilans=%.0fWh wymagane=%.0fWh rezerwa=%.0fWh", id(bilans_godzinowy_wh), wymagany_bufor_przed_startem_wh, id(rezerwa_exportu_godzinowego_wh));
+            return;
+          }
+
           nowy_prog = (dostepna_moc_grzalki_w / 1500.0f) * 100.0f;
 
           nowy_prog = std::round(nowy_prog / 5.0f) * 5.0f;
@@ -686,4 +773,8 @@ script:
             id(grzalka_moc).publish_state(nowy_prog);
             id(grzalka_pwm).set_level(nowy_prog / 100.0f);
             id(led_pwm).set_level(nowy_prog / 100.0f);
+            if (aktualny_prog == 0.0f && nowy_prog > 0.0f) {
+              id(grzalka_auto_start_w_godzinie) = true;
+              ESP_LOGW("BILANS_H", "Pierwszy start grzalki w tej godzinie po uzbieraniu bufora %.0fWh. bilans=%.0fWh", wymagany_bufor_przed_startem_wh, id(bilans_godzinowy_wh));
+            }
           }

@@ -16,6 +16,8 @@ Założenia:
 - kolejne zwiększenie mocy jest wstrzymywane do czasu odczytu mocy sieci nowszego niż ostatnia zmiana grzałki oraz 60 sekund stabilizacji po tej zmianie,
 - osiągnięcie albo przekroczenie zadanej temperatury CWU oraz obniżenie nastawy poniżej aktualnej temperatury natychmiast wyłącza grzałkę oraz tryby AUTO/MANUAL,
 - tryb AUTO, MANUAL i ręczne ustawienie mocy grzałki są blokowane przez termostat oraz brak potwierdzonego, rzeczywistego odczytu temperatury,
+- konfiguracja próbuje odczytać temperaturę CWU z kilku popularnych `entity_id`; działający odczyt jest widoczny w logu `TERMOSTAT`,
+- przed pierwszym startem AUTO w danej godzinie sterownik zbiera bufor energii, a bank godzinowy zostawia małą rezerwę eksportu zamiast zużywać cały bilans,
 - `Bilans godzinowy moc banku` to moc, którą sterownik może dodatkowo wykorzystać, żeby do końca godziny zejść z bilansem możliwie blisko zera.
 
 Przed wgraniem dodaj do `secrets.yaml`:
