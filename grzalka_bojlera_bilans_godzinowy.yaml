@@ -530,6 +530,13 @@ script:
 
           nowy_prog = std::round(nowy_prog / 5.0f) * 5.0f;
 
+          // Podbijanie mocy robimy ostroznie, bo licznik sieci odswieza sie wolniej
+          // niz zmiany PWM grzalki. Ciecie mocy nadal moze byc natychmiastowe.
+          float maks_wzrost = aktualny_prog == 0.0f ? 35.0f : 25.0f;
+          if (nowy_prog > aktualny_prog + maks_wzrost) {
+            nowy_prog = aktualny_prog + maks_wzrost;
+          }
+
           if (nowy_prog > 0.0f && nowy_prog < 15.0f) {
             nowy_prog = 0.0f;
             ESP_LOGD("MIN_POWER", "Za mala nadwyzka na prog 200W. Wylaczam.");
