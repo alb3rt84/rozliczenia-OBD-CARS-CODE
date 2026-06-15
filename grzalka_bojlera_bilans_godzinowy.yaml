@@ -533,8 +533,10 @@ script:
           bool grid_po_zmianie_grzalki = id(grid_power_ostatni_odczyt_ms) != 0 &&
               (id(grzalka_moc_ostatnia_zmiana_ms) == 0 ||
                (int32_t) (id(grid_power_ostatni_odczyt_ms) - id(grzalka_moc_ostatnia_zmiana_ms)) >= 0);
-          if (aktualny_prog > 0.0f && nowy_prog > aktualny_prog && !grid_po_zmianie_grzalki) {
-            ESP_LOGD("BILANS_H", "Czekam ze wzrostem mocy na odczyt sieci po zmianie grzalki. cel=%.0f%% aktualnie=%.0f%%", nowy_prog, aktualny_prog);
+          uint32_t czas_od_zmiany_ms = id(grzalka_moc_ostatnia_zmiana_ms) == 0 ? 0 : millis() - id(grzalka_moc_ostatnia_zmiana_ms);
+          bool grzalka_ustabilizowana = id(grzalka_moc_ostatnia_zmiana_ms) == 0 || czas_od_zmiany_ms >= 60000;
+          if (aktualny_prog > 0.0f && nowy_prog > aktualny_prog && (!grid_po_zmianie_grzalki || !grzalka_ustabilizowana)) {
+            ESP_LOGD("BILANS_H", "Czekam ze wzrostem mocy na stabilny odczyt po zmianie grzalki. cel=%.0f%% aktualnie=%.0f%% od_zmiany=%us grid_po=%s", nowy_prog, aktualny_prog, czas_od_zmiany_ms / 1000, grid_po_zmianie_grzalki ? "tak" : "nie");
             nowy_prog = aktualny_prog;
           }
 
