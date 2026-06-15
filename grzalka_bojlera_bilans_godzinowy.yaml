@@ -204,8 +204,11 @@ sensor:
       - lambda: |-
           id(temp_cwu_wartosc) = x;
           float t_max = id(temp_max_ustawienie).state;
-          if (!std::isnan(x) && x >= t_max && id(grzalka_moc).state > 0.0f) {
-            ESP_LOGE("TERMOSTAT", "Bojler osiagnal zadana temperature (%.1fC >= %.0fC). Awaryjne wylaczenie!", x, t_max);
+          if (!std::isnan(x) && !std::isnan(t_max) && x >= t_max &&
+              (id(tryb_auto).state || id(tryb_manual).state || id(grzalka_moc).state > 0.0f)) {
+            ESP_LOGE("TERMOSTAT", "Bojler osiagnal zadana temperature (%.1fC >= %.0fC). Wylaczam grzalke i tryby pracy!", x, t_max);
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
             id(grzalka_moc).publish_state(0.0f);
             id(grzalka_pwm).set_level(0.0f);
             id(led_pwm).set_level(0.0f);
