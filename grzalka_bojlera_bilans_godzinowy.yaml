@@ -89,6 +89,10 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+  - id: temp_cwu_ma_odczyt
+    type: bool
+    restore_value: no
+    initial_value: 'false'
 
   # Bilans godzinowy: dodatni = nadwyzka oddana do sieci w aktualnej godzinie.
   - id: bilans_zainicjowany
@@ -149,10 +153,14 @@ number:
       - lambda: |-
           float t_max = id(temp_max_ustawienie).state;
           float t_wody = id(temp_cwu_ha).state;
-          if (std::isnan(t_wody)) t_wody = id(temp_cwu_wartosc);
+          bool temp_ok = !std::isnan(t_wody);
+          if (!temp_ok && id(temp_cwu_ma_odczyt)) {
+            t_wody = id(temp_cwu_wartosc);
+            temp_ok = !std::isnan(t_wody);
+          }
 
-          if (x > 0.0f && (std::isnan(t_wody) || std::isnan(t_max) || t_wody >= t_max)) {
-            if (std::isnan(t_wody) || std::isnan(t_max)) {
+          if (x > 0.0f && (!temp_ok || std::isnan(t_max) || t_wody >= t_max)) {
+            if (!temp_ok || std::isnan(t_max)) {
               ESP_LOGE("TERMOSTAT", "Blokuje moc grzalki %.0f%%: brak poprawnej temperatury CWU albo nastawy.", x);
             } else {
               ESP_LOGE("TERMOSTAT", "Blokuje moc grzalki %.0f%%: woda %.1fC >= nastawa %.0fC. Wylaczam tryby pracy.", x, t_wody, t_max);
@@ -184,9 +192,13 @@ number:
     on_value:
       - lambda: |-
           float t_wody = id(temp_cwu_ha).state;
-          if (std::isnan(t_wody)) t_wody = id(temp_cwu_wartosc);
+          bool temp_ok = !std::isnan(t_wody);
+          if (!temp_ok && id(temp_cwu_ma_odczyt)) {
+            t_wody = id(temp_cwu_wartosc);
+            temp_ok = !std::isnan(t_wody);
+          }
 
-          if (std::isnan(t_wody)) {
+          if (!temp_ok) {
             ESP_LOGE("SUWAK", "Brak poprawnego odczytu temperatury CWU po zmianie nastawy na %.0fC. Wylaczam grzalke i tryby pracy.", x);
             id(tryb_auto).turn_off();
             id(tryb_manual).turn_off();
@@ -241,7 +253,19 @@ sensor:
     entity_id: sensor.defro_pelet_temperatura_c_w_u_temperatura
     on_value:
       - lambda: |-
+          if (std::isnan(x)) {
+            id(temp_cwu_ma_odczyt) = false;
+            ESP_LOGE("TERMOSTAT", "Odczyt temperatury CWU jest niepoprawny. Wylaczam grzalke i tryby pracy!");
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+            return;
+          }
+
           id(temp_cwu_wartosc) = x;
+          id(temp_cwu_ma_odczyt) = true;
           float t_max = id(temp_max_ustawienie).state;
           if (!std::isnan(x) && !std::isnan(t_max) && x >= t_max &&
               (id(tryb_auto).state || id(tryb_manual).state || id(grzalka_moc).state > 0.0f)) {
@@ -355,10 +379,14 @@ switch:
       - lambda: |-
           float t_max = id(temp_max_ustawienie).state;
           float t_wody = id(temp_cwu_ha).state;
-          if (std::isnan(t_wody)) t_wody = id(temp_cwu_wartosc);
+          bool temp_ok = !std::isnan(t_wody);
+          if (!temp_ok && id(temp_cwu_ma_odczyt)) {
+            t_wody = id(temp_cwu_wartosc);
+            temp_ok = !std::isnan(t_wody);
+          }
 
-          if (std::isnan(t_wody) || std::isnan(t_max) || t_wody >= t_max) {
-            if (std::isnan(t_wody) || std::isnan(t_max)) {
+          if (!temp_ok || std::isnan(t_max) || t_wody >= t_max) {
+            if (!temp_ok || std::isnan(t_max)) {
               ESP_LOGE("TERMOSTAT", "Nie wlaczam MANUAL: brak poprawnej temperatury CWU albo nastawy.");
             } else {
               ESP_LOGE("TERMOSTAT", "Nie wlaczam MANUAL: woda %.1fC >= nastawa %.0fC.", t_wody, t_max);
@@ -386,9 +414,13 @@ script:
       - lambda: |-
           float t_max = id(temp_max_ustawienie).state;
           float t_wody = id(temp_cwu_ha).state;
-          if (std::isnan(t_wody)) t_wody = id(temp_cwu_wartosc);
+          bool temp_ok = !std::isnan(t_wody);
+          if (!temp_ok && id(temp_cwu_ma_odczyt)) {
+            t_wody = id(temp_cwu_wartosc);
+            temp_ok = !std::isnan(t_wody);
+          }
 
-          if (std::isnan(t_wody)) {
+          if (!temp_ok) {
             ESP_LOGE("SUWAK", "Brak poprawnego odczytu temperatury CWU. Wylaczam grzalke i tryby pracy.");
             id(tryb_auto).turn_off();
             id(tryb_manual).turn_off();
@@ -411,9 +443,18 @@ script:
     then:
       - lambda: |-
           if (!id(tryb_auto).state) return;
-          if (!std::isnan(id(temp_cwu_wartosc)) && !std::isnan(id(temp_max_ustawienie).state) &&
-              id(temp_cwu_wartosc) >= id(temp_max_ustawienie).state) {
-            ESP_LOGE("TERMOSTAT", "Temperatura CWU %.1fC >= nastawa %.0fC podczas szybkiej reakcji. Wylaczam grzalke i tryby pracy.", id(temp_cwu_wartosc), id(temp_max_ustawienie).state);
+          float t_max = id(temp_max_ustawienie).state;
+          if (!id(temp_cwu_ma_odczyt) || std::isnan(t_max)) {
+            ESP_LOGE("TERMOSTAT", "Brak poprawnej temperatury CWU albo nastawy podczas szybkiej reakcji. Wylaczam grzalke i tryby pracy.");
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+            return;
+          }
+          if (id(temp_cwu_wartosc) >= t_max) {
+            ESP_LOGE("TERMOSTAT", "Temperatura CWU %.1fC >= nastawa %.0fC podczas szybkiej reakcji. Wylaczam grzalke i tryby pracy.", id(temp_cwu_wartosc), t_max);
             id(tryb_auto).turn_off();
             id(tryb_manual).turn_off();
             id(grzalka_moc).publish_state(0.0f);
@@ -571,9 +612,22 @@ script:
             return;
           }
 
-          if (id(temp_cwu_wartosc) >= id(temp_max_ustawienie).state) {
+          float t_max = id(temp_max_ustawienie).state;
+          if (!id(temp_cwu_ma_odczyt) || std::isnan(t_max)) {
+            ESP_LOGE("TERMOSTAT", "Brak poprawnej temperatury CWU albo nastawy w AUTO. Wylaczam grzalke i tryby pracy.");
             id(tryb_auto).turn_off();
             id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+            return;
+          }
+          if (id(temp_cwu_wartosc) >= t_max) {
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
             return;
           }
 
