@@ -81,6 +81,10 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+  - id: grzalka_moc_ostatnia_zmiana_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
   - id: temp_cwu_wartosc
     type: float
     restore_value: no
@@ -148,6 +152,8 @@ number:
       - output.set_level:
           id: led_pwm
           level: !lambda "return x / 100.0;"
+      - lambda: |-
+          id(grzalka_moc_ostatnia_zmiana_ms) = millis();
 
   - platform: template
     name: "Moc grzałki temperatura max"
@@ -518,20 +524,20 @@ script:
             return;
           }
 
-          if (dostepna_moc_grzalki_w > 1400.0f) {
-            id(grzalka_moc).publish_state(100.0f);
-            id(grzalka_pwm).set_level(1.0f);
-            id(led_pwm).set_level(1.0f);
-            ESP_LOGW("BILANS_H", "Pelna moc. Siec=%.0fW skoryg=%.0fW wiek=%us okno=%.0fW bank=%.0fW bilans_h=%.0fWh", id(grid_power_wartosc), skorygowana_moc_sieci_w, wiek_grid_ms / 1000, realny_bilans_sieci_w, moc_z_banku_w, id(bilans_godzinowy_wh));
-            return;
-          }
-
           nowy_prog = (dostepna_moc_grzalki_w / 1500.0f) * 100.0f;
 
           nowy_prog = std::round(nowy_prog / 5.0f) * 5.0f;
 
           // Podbijanie mocy robimy ostroznie, bo licznik sieci odswieza sie wolniej
           // niz zmiany PWM grzalki. Ciecie mocy nadal moze byc natychmiastowe.
+          bool grid_po_zmianie_grzalki = id(grid_power_ostatni_odczyt_ms) != 0 &&
+              (id(grzalka_moc_ostatnia_zmiana_ms) == 0 ||
+               (int32_t) (id(grid_power_ostatni_odczyt_ms) - id(grzalka_moc_ostatnia_zmiana_ms)) >= 0);
+          if (aktualny_prog > 0.0f && nowy_prog > aktualny_prog && !grid_po_zmianie_grzalki) {
+            ESP_LOGD("BILANS_H", "Czekam ze wzrostem mocy na odczyt sieci po zmianie grzalki. cel=%.0f%% aktualnie=%.0f%%", nowy_prog, aktualny_prog);
+            nowy_prog = aktualny_prog;
+          }
+
           float maks_wzrost = aktualny_prog == 0.0f ? 35.0f : 25.0f;
           if (nowy_prog > aktualny_prog + maks_wzrost) {
             nowy_prog = aktualny_prog + maks_wzrost;
