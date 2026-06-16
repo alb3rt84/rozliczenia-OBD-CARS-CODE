@@ -151,6 +151,18 @@ globals:
     type: float
     restore_value: no
     initial_value: '300.0'
+  - id: cena_zakupu_energii_zl_kwh
+    type: float
+    restore_value: no
+    initial_value: '1.00'
+  - id: cena_sprzedazy_energii_zl_kwh
+    type: float
+    restore_value: no
+    initial_value: '0.35'
+  - id: bilans_wartosciowy_wh
+    type: float
+    restore_value: no
+    initial_value: '0.0'
   - id: auto_wylaczone_przez_termostat
     type: bool
     restore_value: no
@@ -432,6 +444,16 @@ sensor:
     update_interval: 30s
 
   - platform: template
+    name: "Bilans wartościowy"
+    id: bilans_wartosciowy_energia
+    unit_of_measurement: "Wh"
+    accuracy_decimals: 0
+    icon: "mdi:cash-clock"
+    lambda: |-
+      return id(bilans_wartosciowy_wh);
+    update_interval: 30s
+
+  - platform: template
     name: "Dostępna moc z bufora"
     id: bilans_godzinowy_moc_banku
     unit_of_measurement: "W"
@@ -475,7 +497,10 @@ text_sensor:
       }
 
       float wymagany_bufor_wh = id(bufor_startu_grzalki_wh) + id(rezerwa_exportu_godzinowego_wh);
-      if (!id(grzalka_auto_start_w_godzinie) && id(bilans_godzinowy_wh) < wymagany_bufor_wh) {
+      if (!id(grzalka_auto_start_w_godzinie) && id(bilans_wartosciowy_wh) < wymagany_bufor_wh) {
+        if (id(bilans_godzinowy_wh) > 0.0f) {
+          return std::string("Zbieram bufor net-billing");
+        }
         return std::string("Zbieram bufor");
       }
 
@@ -702,6 +727,7 @@ script:
             id(ostatni_export_kwh) = c_export;
             id(ostatni_odczyt_ms) = millis();
             id(bilans_godzinowy_wh) = 0.0f;
+            id(bilans_wartosciowy_wh) = 0.0f;
             id(srednia_moc_okna_w) = 0.0f;
             id(moc_banku_godzinowego_w) = 0.0f;
             id(grzalka_auto_start_w_godzinie) = false;
@@ -745,6 +771,12 @@ script:
           float import_godzina_wh = (c_import - id(start_import_kwh_godzina)) * 1000.0f;
           float export_godzina_wh = (c_export - id(start_export_kwh_godzina)) * 1000.0f;
           id(bilans_godzinowy_wh) = export_godzina_wh - import_godzina_wh;
+          float wspolczynnik_net_billing = 0.0f;
+          if (id(cena_zakupu_energii_zl_kwh) > 0.0f && id(cena_sprzedazy_energii_zl_kwh) > 0.0f) {
+            wspolczynnik_net_billing = id(cena_sprzedazy_energii_zl_kwh) / id(cena_zakupu_energii_zl_kwh);
+            if (wspolczynnik_net_billing > 1.0f) wspolczynnik_net_billing = 1.0f;
+          }
+          id(bilans_wartosciowy_wh) = export_godzina_wh * wspolczynnik_net_billing - import_godzina_wh;
 
           float pozostalo_s = 1800.0f;
           if (czas_ok) {
@@ -753,7 +785,7 @@ script:
           }
 
           float moc_z_banku_w = 0.0f;
-          float bilans_do_wykorzystania_wh = id(bilans_godzinowy_wh) - id(rezerwa_exportu_godzinowego_wh);
+          float bilans_do_wykorzystania_wh = id(bilans_wartosciowy_wh) - id(rezerwa_exportu_godzinowego_wh);
           if (bilans_do_wykorzystania_wh > 5.0f) {
             moc_z_banku_w = (bilans_do_wykorzystania_wh * 3600.0f) / pozostalo_s;
             if (moc_z_banku_w > 1500.0f) moc_z_banku_w = 1500.0f;
@@ -809,8 +841,8 @@ script:
 
           float wymagany_bufor_przed_startem_wh = id(bufor_startu_grzalki_wh) + id(rezerwa_exportu_godzinowego_wh);
           if (aktualny_prog == 0.0f && !id(grzalka_auto_start_w_godzinie) &&
-              id(bilans_godzinowy_wh) < wymagany_bufor_przed_startem_wh) {
-            ESP_LOGD("BILANS_H", "Zbieram bufor przed pierwszym startem grzalki: bilans=%.0fWh wymagane=%.0fWh rezerwa=%.0fWh", id(bilans_godzinowy_wh), wymagany_bufor_przed_startem_wh, id(rezerwa_exportu_godzinowego_wh));
+              id(bilans_wartosciowy_wh) < wymagany_bufor_przed_startem_wh) {
+            ESP_LOGD("BILANS_H", "Zbieram bufor przed pierwszym startem grzalki: bilans_wart=%.0fWh bilans=%.0fWh wymagane=%.0fWh rezerwa=%.0fWh", id(bilans_wartosciowy_wh), id(bilans_godzinowy_wh), wymagany_bufor_przed_startem_wh, id(rezerwa_exportu_godzinowego_wh));
             return;
           }
 
@@ -843,7 +875,7 @@ script:
           if (nowy_prog > 100.0f) nowy_prog = 100.0f;
           if (nowy_prog < 0.0f) nowy_prog = 0.0f;
 
-          ESP_LOGW("BILANS_H", "Siec=%.0fW | skoryg=%.0fW | wiek=%us | chwilowo=%.0fW | Okno30s=%.0fW | bilans_h=%.0fWh | bank=%.0fW | cel_export=%.0fW | dostepne=%.0fW | cel=%.0f%%", id(grid_power_wartosc), skorygowana_moc_sieci_w, wiek_grid_ms / 1000, chwilowy_bilans_sieci_w, realny_bilans_sieci_w, id(bilans_godzinowy_wh), moc_z_banku_w, id(docelowy_export_w), dostepna_moc_grzalki_w, nowy_prog);
+          ESP_LOGW("BILANS_H", "Siec=%.0fW | skoryg=%.0fW | wiek=%us | chwilowo=%.0fW | Okno30s=%.0fW | bilans_h=%.0fWh | bilans_wart=%.0fWh | bank=%.0fW | cel_export=%.0fW | dostepne=%.0fW | cel=%.0f%%", id(grid_power_wartosc), skorygowana_moc_sieci_w, wiek_grid_ms / 1000, chwilowy_bilans_sieci_w, realny_bilans_sieci_w, id(bilans_godzinowy_wh), id(bilans_wartosciowy_wh), moc_z_banku_w, id(docelowy_export_w), dostepna_moc_grzalki_w, nowy_prog);
 
           if (nowy_prog != aktualny_prog) {
             id(grzalka_moc).publish_state(nowy_prog);
@@ -851,6 +883,6 @@ script:
             id(led_pwm).set_level(nowy_prog / 100.0f);
             if (aktualny_prog == 0.0f && nowy_prog > 0.0f) {
               id(grzalka_auto_start_w_godzinie) = true;
-              ESP_LOGW("BILANS_H", "Pierwszy start grzalki w tej godzinie po uzbieraniu bufora %.0fWh. bilans=%.0fWh", wymagany_bufor_przed_startem_wh, id(bilans_godzinowy_wh));
+              ESP_LOGW("BILANS_H", "Pierwszy start grzalki w tej godzinie po uzbieraniu bufora %.0fWh. bilans_wart=%.0fWh bilans=%.0fWh", wymagany_bufor_przed_startem_wh, id(bilans_wartosciowy_wh), id(bilans_godzinowy_wh));
             }
           }
