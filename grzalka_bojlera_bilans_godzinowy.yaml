@@ -47,6 +47,9 @@ interval:
   - interval: 30s
     then:
       - script.execute: regulacja_auto
+  - interval: 10s
+    then:
+      - script.execute: aktualizuj_statystyki_grzalki
 
 # -- Wyjscia ---------------------------------------------------------------
 output:
@@ -139,6 +142,18 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+  - id: energia_grzalki_kwh
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: czas_pracy_grzalki_h
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: ostatni_pomiar_statystyk_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
   - id: grzalka_auto_start_w_godzinie
     type: bool
     restore_value: no
@@ -288,6 +303,20 @@ number:
             ESP_LOGW("TERMOSTAT", "Woda %.1fC <= prog powrotu %.1fC po zmianie histerezy. Wlaczam AUTO.", t_wody, t_max - id(histereza_temp_cwu));
             id(tryb_auto).turn_on();
           }
+
+button:
+  - platform: template
+    name: "Reset statystyk grzałki"
+    id: reset_statystyk_grzalki
+    icon: "mdi:restart"
+    on_press:
+      - lambda: |-
+          id(energia_grzalki_kwh) = 0.0f;
+          id(czas_pracy_grzalki_h) = 0.0f;
+          id(ostatni_pomiar_statystyk_ms) = millis();
+          id(zuzycie_grzalki_kwh).publish_state(0.0f);
+          id(czas_pracy_grzalki).publish_state(0.0f);
+          ESP_LOGW("STAT_GRZALKA", "Zresetowano statystyki grzalki.");
 
 # -- Sensory ---------------------------------------------------------------
 sensor:
@@ -468,6 +497,29 @@ sensor:
     update_interval: 5s
 
   - platform: template
+    name: "Zużycie grzałki"
+    id: zuzycie_grzalki_kwh
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    icon: "mdi:lightning-bolt"
+    lambda: |-
+      return id(energia_grzalki_kwh);
+    update_interval: 30s
+
+  - platform: template
+    name: "Czas pracy grzałki"
+    id: czas_pracy_grzalki
+    unit_of_measurement: "h"
+    state_class: total_increasing
+    accuracy_decimals: 2
+    icon: "mdi:timer-outline"
+    lambda: |-
+      return id(czas_pracy_grzalki_h);
+    update_interval: 30s
+
+  - platform: template
     name: "Bilans godziny"
     id: bilans_godzinowy_energia
     unit_of_measurement: "Wh"
@@ -606,6 +658,33 @@ switch:
 
 # -- Skrypty logiczne ------------------------------------------------------
 script:
+  - id: aktualizuj_statystyki_grzalki
+    mode: queued
+    then:
+      - lambda: |-
+          uint32_t teraz_ms = millis();
+          if (id(ostatni_pomiar_statystyk_ms) == 0) {
+            id(ostatni_pomiar_statystyk_ms) = teraz_ms;
+            return;
+          }
+
+          float dt_h = (teraz_ms - id(ostatni_pomiar_statystyk_ms)) / 3600000.0f;
+          id(ostatni_pomiar_statystyk_ms) = teraz_ms;
+
+          if (dt_h <= 0.0f || dt_h > 0.1f) {
+            return;
+          }
+
+          float moc_kw = id(grzalka_moc).state / 100.0f * 1.5f;
+          if (moc_kw <= 0.0f) {
+            return;
+          }
+
+          id(energia_grzalki_kwh) += moc_kw * dt_h;
+          id(czas_pracy_grzalki_h) += dt_h;
+          id(zuzycie_grzalki_kwh).publish_state(id(energia_grzalki_kwh));
+          id(czas_pracy_grzalki).publish_state(id(czas_pracy_grzalki_h));
+
   - id: reakcja_na_suwak_temp
     mode: restart
     then:

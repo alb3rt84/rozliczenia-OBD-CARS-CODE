@@ -23,6 +23,7 @@ Założenia:
 - regulacja AUTO zostawia docelowo około `300 W` eksportu jako margines bezpieczeństwa, zamiast dążyć do zera bilansu,
 - sterowanie działa pod autokonsumpcję i godzinowy bilans energii: eksport oraz import są liczone energetycznie w Wh,
 - uproszczone nazwy sensorów bilansu: `Bilans godziny`, `Moc chwilowa 30s`, `Dostępna moc z bufora` oraz tekstowy `Status bilansu grzałki`,
+- statystyki grzałki są liczone lokalnie: `Zużycie grzałki` w kWh oraz `Czas pracy grzałki` w godzinach, z przyciskiem resetu,
 - `Bilans godzinowy moc banku` to moc, którą sterownik może dodatkowo wykorzystać, żeby do końca godziny zejść z bilansem możliwie blisko zera.
 
 Przed wgraniem dodaj do `secrets.yaml`:
