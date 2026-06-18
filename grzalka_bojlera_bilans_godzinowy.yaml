@@ -146,6 +146,14 @@ globals:
     type: float
     restore_value: yes
     initial_value: '0.0'
+  - id: energia_grzalki_nadwyzka_kwh
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: energia_grzalki_import_kwh
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
   - id: czas_pracy_grzalki_h
     type: float
     restore_value: yes
@@ -174,6 +182,14 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
+  - id: grzalka_moc_zmiana_wewnetrzna
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: grzalka_moc_zaakceptowana_proc
+    type: float
+    restore_value: no
+    initial_value: '0.0'
 
 # -- Suwaki ----------------------------------------------------------------
 number:
@@ -190,6 +206,14 @@ number:
     restore_value: false
     on_value:
       - lambda: |-
+          if (id(tryb_auto).state && !id(grzalka_moc_zmiana_wewnetrzna)) {
+            ESP_LOGW("SUWAK", "Ignoruje reczna zmiane mocy grzalki %.0f%% w trybie AUTO.", x);
+            id(grzalka_moc_zmiana_wewnetrzna) = true;
+            id(grzalka_moc).publish_state(id(grzalka_moc_zaakceptowana_proc));
+            id(grzalka_moc_zmiana_wewnetrzna) = false;
+            return;
+          }
+
           float t_max = id(temp_max_ustawienie).state;
           float t_wody = id(temp_cwu_ha).state;
           bool temp_ok = !std::isnan(t_wody);
@@ -215,6 +239,7 @@ number:
           }
 
           id(grzalka_moc_ostatnia_zmiana_ms) = millis();
+          id(grzalka_moc_zaakceptowana_proc) = x;
           id(grzalka_pwm).set_level(x / 100.0f);
           id(led_pwm).set_level(x / 100.0f);
 
@@ -312,9 +337,14 @@ button:
     on_press:
       - lambda: |-
           id(energia_grzalki_kwh) = 0.0f;
+          id(energia_grzalki_nadwyzka_kwh) = 0.0f;
+          id(energia_grzalki_import_kwh) = 0.0f;
           id(czas_pracy_grzalki_h) = 0.0f;
           id(ostatni_pomiar_statystyk_ms) = millis();
           id(zuzycie_grzalki_kwh).publish_state(0.0f);
+          id(zuzycie_grzalki_nadwyzka_kwh).publish_state(0.0f);
+          id(zuzycie_grzalki_import_kwh).publish_state(0.0f);
+          id(sprawnosc_grzalki_proc).publish_state(0.0f);
           id(czas_pracy_grzalki).publish_state(0.0f);
           ESP_LOGW("STAT_GRZALKA", "Zresetowano statystyki grzalki.");
 
@@ -509,6 +539,45 @@ sensor:
     update_interval: 30s
 
   - platform: template
+    name: "Zużycie grzałki z nadwyżki PV"
+    id: zuzycie_grzalki_nadwyzka_kwh
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    icon: "mdi:solar-power-variant"
+    lambda: |-
+      return id(energia_grzalki_nadwyzka_kwh);
+    update_interval: 30s
+
+  - platform: template
+    name: "Zużycie grzałki przy imporcie"
+    id: zuzycie_grzalki_import_kwh
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    icon: "mdi:transmission-tower-import"
+    lambda: |-
+      return id(energia_grzalki_import_kwh);
+    update_interval: 30s
+
+  - platform: template
+    name: "Sprawność grzałki"
+    id: sprawnosc_grzalki_proc
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 1
+    icon: "mdi:percent-circle-outline"
+    lambda: |-
+      if (id(energia_grzalki_kwh) <= 0.0f) return 0.0f;
+      float sprawnosc = (id(energia_grzalki_nadwyzka_kwh) / id(energia_grzalki_kwh)) * 100.0f;
+      if (sprawnosc > 100.0f) sprawnosc = 100.0f;
+      if (sprawnosc < 0.0f) sprawnosc = 0.0f;
+      return sprawnosc;
+    update_interval: 30s
+
+  - platform: template
     name: "Czas pracy grzałki"
     id: czas_pracy_grzalki
     unit_of_measurement: "h"
@@ -604,9 +673,12 @@ switch:
       - logger.log: "Tryb AUTO aktywny"
       - lambda: |-
           id(auto_wylaczone_przez_termostat) = false;
+          id(grzalka_moc_zmiana_wewnetrzna) = true;
       - number.set:
           id: grzalka_moc
           value: 0
+      - lambda: |-
+          id(grzalka_moc_zmiana_wewnetrzna) = false;
       - delay: 1s
       - script.execute: regulacja_auto
     turn_off_action:
@@ -680,9 +752,28 @@ script:
             return;
           }
 
-          id(energia_grzalki_kwh) += moc_kw * dt_h;
+          float energia_okna_kwh = moc_kw * dt_h;
+          float import_kw = id(grid_power_wartosc) > 0.0f ? id(grid_power_wartosc) / 1000.0f : 0.0f;
+          if (std::isnan(import_kw) || import_kw < 0.0f) import_kw = 0.0f;
+          if (import_kw > moc_kw) import_kw = moc_kw;
+
+          float energia_import_kwh = import_kw * dt_h;
+          float energia_nadwyzka_kwh = energia_okna_kwh - energia_import_kwh;
+          if (energia_nadwyzka_kwh < 0.0f) energia_nadwyzka_kwh = 0.0f;
+
+          id(energia_grzalki_kwh) += energia_okna_kwh;
+          id(energia_grzalki_import_kwh) += energia_import_kwh;
+          id(energia_grzalki_nadwyzka_kwh) += energia_nadwyzka_kwh;
           id(czas_pracy_grzalki_h) += dt_h;
           id(zuzycie_grzalki_kwh).publish_state(id(energia_grzalki_kwh));
+          id(zuzycie_grzalki_import_kwh).publish_state(id(energia_grzalki_import_kwh));
+          id(zuzycie_grzalki_nadwyzka_kwh).publish_state(id(energia_grzalki_nadwyzka_kwh));
+          float sprawnosc = id(energia_grzalki_kwh) > 0.0f
+              ? (id(energia_grzalki_nadwyzka_kwh) / id(energia_grzalki_kwh)) * 100.0f
+              : 0.0f;
+          if (sprawnosc > 100.0f) sprawnosc = 100.0f;
+          if (sprawnosc < 0.0f) sprawnosc = 0.0f;
+          id(sprawnosc_grzalki_proc).publish_state(sprawnosc);
           id(czas_pracy_grzalki).publish_state(id(czas_pracy_grzalki_h));
 
   - id: reakcja_na_suwak_temp
@@ -779,7 +870,9 @@ script:
 
             if (nowy_prog != aktualny_prog) {
               ESP_LOGE("BEZPIECZNIK", "Szybkie ciecie. Siec=%.0fW skoryg=%.0fW wiek=%us bank=%.0fW grzalka=%.0fW cel_export=%.0fW dostepne=%.0fW. Ustawiam %.0f%%", id(grid_power_wartosc), skorygowana_moc_sieci_w, wiek_grid_ms / 1000, moc_banku_w, moc_grzalki_w, id(docelowy_export_w), dostepna_moc_grzalki_w, nowy_prog);
+              id(grzalka_moc_zmiana_wewnetrzna) = true;
               id(grzalka_moc).publish_state(nowy_prog);
+              id(grzalka_moc_zmiana_wewnetrzna) = false;
               id(grzalka_pwm).set_level(nowy_prog / 100.0f);
               id(led_pwm).set_level(nowy_prog / 100.0f);
             }
@@ -975,7 +1068,9 @@ script:
           ESP_LOGW("BILANS_H", "Siec=%.0fW | skoryg=%.0fW | wiek=%us | chwilowo=%.0fW | Okno30s=%.0fW | bilans_h=%.0fWh | bank=%.0fW | cel_export=%.0fW | dostepne=%.0fW | cel=%.0f%%", id(grid_power_wartosc), skorygowana_moc_sieci_w, wiek_grid_ms / 1000, chwilowy_bilans_sieci_w, realny_bilans_sieci_w, id(bilans_godzinowy_wh), moc_z_banku_w, id(docelowy_export_w), dostepna_moc_grzalki_w, nowy_prog);
 
           if (nowy_prog != aktualny_prog) {
+            id(grzalka_moc_zmiana_wewnetrzna) = true;
             id(grzalka_moc).publish_state(nowy_prog);
+            id(grzalka_moc_zmiana_wewnetrzna) = false;
             id(grzalka_pwm).set_level(nowy_prog / 100.0f);
             id(led_pwm).set_level(nowy_prog / 100.0f);
             if (aktualny_prog == 0.0f && nowy_prog > 0.0f) {
