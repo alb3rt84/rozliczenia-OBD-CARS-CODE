@@ -21,6 +21,7 @@ Założenia:
 - ręczna zmiana suwaka `Moc grzałki` jest ignorowana w trybie AUTO, gdzie moc ustawia wyłącznie automatyka,
 - konfiguracja próbuje odczytać temperaturę CWU z kilku popularnych `entity_id`; działający odczyt jest widoczny w logu `TERMOSTAT`,
 - lokalny `web_server` ESPHome jest dostępny na porcie `80`; w normalnej sieci po adresie IP urządzenia albo `http://grzaka-bojlera.local`, a w fallback hotspocie zwykle pod `http://192.168.4.1`,
+- ESP32 nie restartuje się automatycznie przy braku WiFi albo połączenia API z Home Assistant i po ponownym połączeniu publikuje lokalne stany suwaka oraz sensorów,
 - bufor energii przed pierwszym startem w godzinie zbiera się także przy wyłączonym AUTO; pierwszy start wymaga około `70 Wh` dodatniego bilansu (`60 Wh` bufora + `10 Wh` rezerwy eksportu),
 - regulacja AUTO zostawia docelowo około `300 W` eksportu jako margines bezpieczeństwa, zamiast dążyć do zera bilansu,
 - sterowanie działa pod autokonsumpcję i godzinowy bilans energii: eksport oraz import są liczone energetycznie w Wh,

@@ -13,6 +13,7 @@ esphome:
       - number.set:
           id: grzalka_moc
           value: 0
+      - script.execute: publikuj_stany_lokalne
 
 esp32:
   board: esp32dev
@@ -24,6 +25,10 @@ logger:
 api:
   encryption:
     key: !secret grzalka_bojlera_api_key
+  reboot_timeout: 0s
+  on_client_connected:
+    - delay: 2s
+    - script.execute: publikuj_stany_lokalne
 
 ota:
   - platform: esphome
@@ -32,6 +37,10 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  reboot_timeout: 0s
+  power_save_mode: none
+  on_connect:
+    - script.execute: publikuj_stany_lokalne
   ap:
     ssid: "Grzaka-Bojlera Fallback Hotspot"
     password: !secret grzalka_bojlera_ap_password
@@ -734,6 +743,39 @@ switch:
 
 # -- Skrypty logiczne ------------------------------------------------------
 script:
+  - id: publikuj_stany_lokalne
+    mode: restart
+    then:
+      - lambda: |-
+          float moc_proc = id(grzalka_moc).state;
+          if (std::isnan(moc_proc)) moc_proc = id(grzalka_moc_zaakceptowana_proc);
+          if (std::isnan(moc_proc)) moc_proc = 0.0f;
+          if (moc_proc > 100.0f) moc_proc = 100.0f;
+          if (moc_proc < 0.0f) moc_proc = 0.0f;
+
+          float sprawnosc = id(energia_grzalki_kwh) > 0.0f
+              ? (id(energia_grzalki_nadwyzka_kwh) / id(energia_grzalki_kwh)) * 100.0f
+              : 0.0f;
+          if (sprawnosc > 100.0f) sprawnosc = 100.0f;
+          if (sprawnosc < 0.0f) sprawnosc = 0.0f;
+
+          id(grzalka_moc_zmiana_wewnetrzna) = true;
+          id(grzalka_moc).publish_state(moc_proc);
+          id(grzalka_moc_zmiana_wewnetrzna) = false;
+          id(grzalka_moc_zaakceptowana_proc) = moc_proc;
+          id(moc_grzalki_w).publish_state(moc_proc / 100.0f * 1500.0f);
+          id(zuzycie_grzalki_kwh).publish_state(id(energia_grzalki_kwh));
+          id(zuzycie_grzalki_nadwyzka_kwh).publish_state(id(energia_grzalki_nadwyzka_kwh));
+          id(zuzycie_grzalki_import_kwh).publish_state(id(energia_grzalki_import_kwh));
+          id(sprawnosc_grzalki_proc).publish_state(sprawnosc);
+          id(czas_pracy_grzalki).publish_state(id(czas_pracy_grzalki_h));
+          id(moc_sieci_waty).publish_state(id(grid_power_wartosc));
+          id(bilans_pobrana_oddana).publish_state(id(grid_power_wartosc));
+          id(bilans_godzinowy_energia).publish_state(id(bilans_godzinowy_wh));
+          id(bilans_godzinowy_moc_banku).publish_state(id(moc_banku_godzinowego_w));
+          id(bilans_godzinowy_moc_okna).publish_state(id(srednia_moc_okna_w));
+          ESP_LOGD("STANY", "Opublikowano lokalne stany po starcie lub ponownym polaczeniu.");
+
   - id: aktualizuj_statystyki_grzalki
     mode: queued
     then:
