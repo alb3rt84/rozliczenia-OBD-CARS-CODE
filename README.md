@@ -18,12 +18,15 @@ Założenia:
 - spadek temperatury CWU poniżej nastawy o ustawioną histerezę automatycznie włącza tryb AUTO tylko wtedy, gdy AUTO zostało wcześniej wyłączone przez termostat,
 - histereza temperatury CWU ma osobny suwak `0-5°C` z krokiem `0.5°C`,
 - tryb AUTO, MANUAL i ręczne ustawienie mocy grzałki są blokowane przez termostat oraz brak potwierdzonego, rzeczywistego odczytu temperatury,
+- ręczna zmiana suwaka `Moc grzałki` jest ignorowana w trybie AUTO, gdzie moc ustawia wyłącznie automatyka,
 - konfiguracja próbuje odczytać temperaturę CWU z kilku popularnych `entity_id`; działający odczyt jest widoczny w logu `TERMOSTAT`,
+- lokalny `web_server` ESPHome jest dostępny na porcie `80`; w normalnej sieci po adresie IP urządzenia albo `http://grzaka-bojlera.local`, a w fallback hotspocie zwykle pod `http://192.168.4.1`,
+- ESP32 nie restartuje się automatycznie przy braku WiFi albo połączenia API z Home Assistant i po ponownym połączeniu publikuje lokalne stany suwaka oraz sensorów,
 - bufor energii przed pierwszym startem w godzinie zbiera się także przy wyłączonym AUTO; pierwszy start wymaga około `70 Wh` dodatniego bilansu (`60 Wh` bufora + `10 Wh` rezerwy eksportu),
 - regulacja AUTO zostawia docelowo około `300 W` eksportu jako margines bezpieczeństwa, zamiast dążyć do zera bilansu,
 - sterowanie działa pod autokonsumpcję i godzinowy bilans energii: eksport oraz import są liczone energetycznie w Wh,
 - uproszczone nazwy sensorów bilansu: `Bilans godziny`, `Moc chwilowa 30s`, `Dostępna moc z bufora` oraz tekstowy `Status bilansu grzałki`,
-- statystyki grzałki są liczone lokalnie: `Zużycie grzałki` w kWh oraz `Czas pracy grzałki` w godzinach, z przyciskiem resetu,
+- statystyki grzałki są liczone lokalnie: `Zużycie grzałki`, `Zużycie grzałki z nadwyżki PV`, `Zużycie grzałki przy imporcie`, `Sprawność grzałki` oraz `Czas pracy grzałki`, z przyciskiem resetu,
 - `Bilans godzinowy moc banku` to moc, którą sterownik może dodatkowo wykorzystać, żeby do końca godziny zejść z bilansem możliwie blisko zera.
 
 Przed wgraniem dodaj do `secrets.yaml`:
