@@ -159,6 +159,26 @@ globals:
     type: uint32_t
     restore_value: no
     initial_value: '0'
+  - id: licznik_import_ostatni_odczyt_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: licznik_export_ostatni_odczyt_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: licznik_energii_ostatni_odczyt_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: licznik_energii_przeterminowany
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+  - id: maks_wiek_licznika_energii_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '120000'
   - id: bilans_godzinowy_wh
     type: float
     restore_value: no
@@ -429,10 +449,22 @@ sensor:
   - platform: homeassistant
     id: licznik_import_ha
     entity_id: sensor.licznik_energii_wm_bus_gateway_energia_pobrana
+    on_value:
+      - lambda: |-
+          if (!std::isnan(x)) {
+            id(licznik_import_ostatni_odczyt_ms) = millis();
+            id(licznik_energii_ostatni_odczyt_ms) = millis();
+          }
 
   - platform: homeassistant
     id: licznik_export_ha
     entity_id: sensor.licznik_energii_wm_bus_gateway_energia_oddana
+    on_value:
+      - lambda: |-
+          if (!std::isnan(x)) {
+            id(licznik_export_ostatni_odczyt_ms) = millis();
+            id(licznik_energii_ostatni_odczyt_ms) = millis();
+          }
 
   - platform: homeassistant
     id: temp_cwu_ha
@@ -742,6 +774,9 @@ text_sensor:
           id(temp_cwu_wartosc) > t_max - id(histereza_temp_cwu)) {
         return std::string("Czekam na spadek temperatury");
       }
+      if (id(licznik_energii_przeterminowany)) {
+        return std::string("Brak danych licznika");
+      }
 
       if (id(grid_power_wartosc) > 50.0f) {
         return std::string("Pobór z sieci");
@@ -997,6 +1032,24 @@ script:
             return;
           }
 
+          uint32_t teraz_ms = millis();
+          bool brak_danych_licznika = id(licznik_energii_ostatni_odczyt_ms) == 0 ||
+              teraz_ms - id(licznik_energii_ostatni_odczyt_ms) > id(maks_wiek_licznika_energii_ms);
+          if (brak_danych_licznika) {
+            id(licznik_energii_przeterminowany) = true;
+            if (id(grzalka_moc).state > 0.0f) {
+              ESP_LOGE("LICZNIK", "Szybkie zabezpieczenie: brak swiezych danych licznika energii. Wylaczam moc grzalki.");
+              id(grzalka_moc_zmiana_wewnetrzna) = true;
+              id(grzalka_moc).publish_state(0.0f);
+              id(grzalka_moc_zmiana_wewnetrzna) = false;
+              id(grzalka_moc_zaakceptowana_proc) = 0.0f;
+              id(grzalka_pwm).set_level(0.0f);
+              id(led_pwm).set_level(0.0f);
+              id(grzalka_moc_ostatnia_zmiana_ms) = teraz_ms;
+            }
+            return;
+          }
+
           float prod_pv = id(pv_power_wartosc);
           float aktualny_prog = id(grzalka_moc).state;
 
@@ -1073,9 +1126,58 @@ script:
           float c_export = id(licznik_export_ha).state;
 
           if (std::isnan(c_import) || std::isnan(c_export)) {
-            ESP_LOGD("BILANS_H", "Oczekiwanie na poprawne liczniki energii z Home Assistant...");
+            id(licznik_energii_przeterminowany) = true;
+            id(srednia_moc_okna_w) = 0.0f;
+            id(moc_banku_godzinowego_w) = 0.0f;
+            id(bilans_godzinowy_moc_okna).publish_state(0.0f);
+            id(bilans_godzinowy_moc_banku).publish_state(0.0f);
+            if (id(grzalka_moc).state > 0.0f) {
+              ESP_LOGE("LICZNIK", "Licznik energii jest niedostepny w Home Assistant. Wylaczam moc grzalki.");
+              id(grzalka_moc_zmiana_wewnetrzna) = true;
+              id(grzalka_moc).publish_state(0.0f);
+              id(grzalka_moc_zmiana_wewnetrzna) = false;
+              id(grzalka_moc_zaakceptowana_proc) = 0.0f;
+              id(grzalka_pwm).set_level(0.0f);
+              id(led_pwm).set_level(0.0f);
+              id(grzalka_moc_ostatnia_zmiana_ms) = millis();
+            } else {
+              ESP_LOGD("BILANS_H", "Oczekiwanie na poprawne liczniki energii z Home Assistant...");
+            }
             return;
           }
+
+          uint32_t teraz_ms = millis();
+          bool brak_danych_licznika = id(licznik_energii_ostatni_odczyt_ms) == 0 ||
+              teraz_ms - id(licznik_energii_ostatni_odczyt_ms) > id(maks_wiek_licznika_energii_ms);
+          if (brak_danych_licznika) {
+            id(licznik_energii_przeterminowany) = true;
+            id(srednia_moc_okna_w) = 0.0f;
+            id(moc_banku_godzinowego_w) = 0.0f;
+            id(bilans_godzinowy_moc_okna).publish_state(0.0f);
+            id(bilans_godzinowy_moc_banku).publish_state(0.0f);
+            if (id(grzalka_moc).state > 0.0f) {
+              ESP_LOGE("LICZNIK", "Brak swiezych danych licznika energii: ostatni=%us import=%us export=%us limit=%us. Wylaczam moc grzalki do powrotu danych.",
+                       id(licznik_energii_ostatni_odczyt_ms) == 0 ? 9999 : (teraz_ms - id(licznik_energii_ostatni_odczyt_ms)) / 1000,
+                       id(licznik_import_ostatni_odczyt_ms) == 0 ? 9999 : (teraz_ms - id(licznik_import_ostatni_odczyt_ms)) / 1000,
+                       id(licznik_export_ostatni_odczyt_ms) == 0 ? 9999 : (teraz_ms - id(licznik_export_ostatni_odczyt_ms)) / 1000,
+                       id(maks_wiek_licznika_energii_ms) / 1000);
+              id(grzalka_moc_zmiana_wewnetrzna) = true;
+              id(grzalka_moc).publish_state(0.0f);
+              id(grzalka_moc_zmiana_wewnetrzna) = false;
+              id(grzalka_moc_zaakceptowana_proc) = 0.0f;
+              id(grzalka_pwm).set_level(0.0f);
+              id(led_pwm).set_level(0.0f);
+              id(grzalka_moc_ostatnia_zmiana_ms) = teraz_ms;
+            } else {
+              ESP_LOGD("LICZNIK", "Czekam na swieze dane licznika energii: ostatni=%us import=%us export=%us limit=%us.",
+                       id(licznik_energii_ostatni_odczyt_ms) == 0 ? 9999 : (teraz_ms - id(licznik_energii_ostatni_odczyt_ms)) / 1000,
+                       id(licznik_import_ostatni_odczyt_ms) == 0 ? 9999 : (teraz_ms - id(licznik_import_ostatni_odczyt_ms)) / 1000,
+                       id(licznik_export_ostatni_odczyt_ms) == 0 ? 9999 : (teraz_ms - id(licznik_export_ostatni_odczyt_ms)) / 1000,
+                       id(maks_wiek_licznika_energii_ms) / 1000);
+            }
+            return;
+          }
+          id(licznik_energii_przeterminowany) = false;
 
           auto teraz = id(ha_time).now();
           bool czas_ok = teraz.is_valid();
@@ -1119,7 +1221,6 @@ script:
             return;
           }
 
-          uint32_t teraz_ms = millis();
           float takt_sekundy = (teraz_ms - id(ostatni_odczyt_ms)) / 1000.0f;
           if (takt_sekundy < 5.0f || takt_sekundy > 300.0f) {
             takt_sekundy = 30.0f;
