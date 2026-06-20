@@ -81,6 +81,22 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+  - id: grid_import_power_kw_wartosc
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: grid_export_power_kw_wartosc
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: grid_import_power_ma_odczyt
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: grid_export_power_ma_odczyt
+    type: bool
+    restore_value: no
+    initial_value: 'false'
   - id: pv_power_wartosc
     type: float
     restore_value: no
@@ -368,10 +384,31 @@ sensor:
     entity_id: sensor.energy_grid_licznik_energii_wm_bus_gateway_moc_poboru_licznik_energii_wm_bus_gateway_moc_oddawana_net_power
     on_value:
       - lambda: |-
+          if (id(grid_import_power_ma_odczyt) && id(grid_export_power_ma_odczyt)) {
+            return;
+          }
           id(grid_power_wartosc) = x;
           id(grid_power_ostatni_odczyt_ms) = millis();
           id(pv_power_przy_grid_wartosc) = id(pv_power_wartosc);
           id(grzalka_moc_przy_grid_w) = id(grzalka_moc).state / 100.0f * 1500.0f;
+
+  - platform: homeassistant
+    id: grid_import_power_ha
+    entity_id: sensor.licznik_energii_wm_bus_gateway_moc_poboru
+    on_value:
+      - lambda: |-
+          id(grid_import_power_kw_wartosc) = x;
+          id(grid_import_power_ma_odczyt) = !std::isnan(x);
+      - script.execute: aktualizuj_bilans_mocy_sieci
+
+  - platform: homeassistant
+    id: grid_export_power_ha
+    entity_id: sensor.licznik_energii_wm_bus_gateway_moc_oddawana
+    on_value:
+      - lambda: |-
+          id(grid_export_power_kw_wartosc) = x;
+          id(grid_export_power_ma_odczyt) = !std::isnan(x);
+      - script.execute: aktualizuj_bilans_mocy_sieci
 
   - platform: homeassistant
     id: pv_power_ha
@@ -526,6 +563,30 @@ sensor:
     icon: "mdi:swap-horizontal"
     lambda: |-
       return id(grid_power_wartosc);
+    update_interval: 5s
+
+  - platform: template
+    name: "Moc poboru netto"
+    id: moc_poboru_netto
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    icon: "mdi:transmission-tower-import"
+    lambda: |-
+      return id(grid_power_wartosc) > 0.0f ? id(grid_power_wartosc) : 0.0f;
+    update_interval: 5s
+
+  - platform: template
+    name: "Moc oddawana netto"
+    id: moc_oddawana_netto
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    icon: "mdi:transmission-tower-export"
+    lambda: |-
+      return id(grid_power_wartosc) < 0.0f ? -id(grid_power_wartosc) : 0.0f;
     update_interval: 5s
 
   - platform: template
@@ -743,6 +804,29 @@ switch:
 
 # -- Skrypty logiczne ------------------------------------------------------
 script:
+  - id: aktualizuj_bilans_mocy_sieci
+    mode: restart
+    then:
+      - lambda: |-
+          if (!id(grid_import_power_ma_odczyt) || !id(grid_export_power_ma_odczyt)) {
+            return;
+          }
+
+          float import_kw = id(grid_import_power_kw_wartosc);
+          float export_kw = id(grid_export_power_kw_wartosc);
+          if (std::isnan(import_kw) || import_kw < 0.0f) import_kw = 0.0f;
+          if (std::isnan(export_kw) || export_kw < 0.0f) export_kw = 0.0f;
+
+          id(grid_power_wartosc) = (import_kw - export_kw) * 1000.0f;
+          id(grid_power_ostatni_odczyt_ms) = millis();
+          id(pv_power_przy_grid_wartosc) = id(pv_power_wartosc);
+          id(grzalka_moc_przy_grid_w) = id(grzalka_moc).state / 100.0f * 1500.0f;
+
+          id(moc_sieci_waty).publish_state(id(grid_power_wartosc));
+          id(bilans_pobrana_oddana).publish_state(id(grid_power_wartosc));
+          id(moc_poboru_netto).publish_state(id(grid_power_wartosc) > 0.0f ? id(grid_power_wartosc) : 0.0f);
+          id(moc_oddawana_netto).publish_state(id(grid_power_wartosc) < 0.0f ? -id(grid_power_wartosc) : 0.0f);
+
   - id: publikuj_stany_lokalne
     mode: restart
     then:
@@ -771,6 +855,8 @@ script:
           id(czas_pracy_grzalki).publish_state(id(czas_pracy_grzalki_h));
           id(moc_sieci_waty).publish_state(id(grid_power_wartosc));
           id(bilans_pobrana_oddana).publish_state(id(grid_power_wartosc));
+          id(moc_poboru_netto).publish_state(id(grid_power_wartosc) > 0.0f ? id(grid_power_wartosc) : 0.0f);
+          id(moc_oddawana_netto).publish_state(id(grid_power_wartosc) < 0.0f ? -id(grid_power_wartosc) : 0.0f);
           id(bilans_godzinowy_energia).publish_state(id(bilans_godzinowy_wh));
           id(bilans_godzinowy_moc_banku).publish_state(id(moc_banku_godzinowego_w));
           id(bilans_godzinowy_moc_okna).publish_state(id(srednia_moc_okna_w));
