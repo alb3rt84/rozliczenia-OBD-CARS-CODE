@@ -25,6 +25,7 @@ Założenia:
 - bufor energii przed pierwszym startem w godzinie zbiera się także przy wyłączonym AUTO; pierwszy start wymaga około `70 Wh` dodatniego bilansu (`60 Wh` bufora + `10 Wh` rezerwy eksportu),
 - regulacja AUTO zostawia docelowo około `300 W` eksportu jako margines bezpieczeństwa, zamiast dążyć do zera bilansu,
 - sterowanie działa pod autokonsumpcję i godzinowy bilans energii: eksport oraz import są liczone energetycznie w Wh,
+- chwilowy bilans sieci jest liczony z całkowitej mocy importu i eksportu gatewaya: `Moc poboru - Moc oddawana`; dodatkowe sensory `Moc poboru netto` i `Moc oddawana netto` pokazują wartości po tym porównaniu,
 - uproszczone nazwy sensorów bilansu: `Bilans godziny`, `Moc chwilowa 30s`, `Dostępna moc z bufora` oraz tekstowy `Status bilansu grzałki`,
 - statystyki grzałki są liczone lokalnie: `Zużycie grzałki`, `Zużycie grzałki z nadwyżki PV`, `Zużycie grzałki przy imporcie`, `Sprawność grzałki` oraz `Czas pracy grzałki`, z przyciskiem resetu,
 - `Bilans godzinowy moc banku` to moc, którą sterownik może dodatkowo wykorzystać, żeby do końca godziny zejść z bilansem możliwie blisko zera.
