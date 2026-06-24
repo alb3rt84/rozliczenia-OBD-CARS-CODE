@@ -13,6 +13,7 @@ esphome:
       - number.set:
           id: grzalka_moc
           value: 0
+      - script.execute: publikuj_stany_lokalne
 
 esp32:
   board: esp32dev
@@ -24,6 +25,10 @@ logger:
 api:
   encryption:
     key: !secret grzalka_bojlera_api_key
+  reboot_timeout: 0s
+  on_client_connected:
+    - delay: 2s
+    - script.execute: publikuj_stany_lokalne
 
 ota:
   - platform: esphome
@@ -32,11 +37,19 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  reboot_timeout: 0s
+  power_save_mode: none
+  on_connect:
+    - script.execute: publikuj_stany_lokalne
   ap:
     ssid: "Grzaka-Bojlera Fallback Hotspot"
     password: !secret grzalka_bojlera_ap_password
 
 captive_portal:
+
+web_server:
+  port: 80
+  version: 3
 
 time:
   - platform: homeassistant
@@ -47,6 +60,9 @@ interval:
   - interval: 30s
     then:
       - script.execute: regulacja_auto
+  - interval: 10s
+    then:
+      - script.execute: aktualizuj_statystyki_grzalki
 
 # -- Wyjscia ---------------------------------------------------------------
 output:
@@ -65,6 +81,22 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+  - id: grid_import_power_kw_wartosc
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: grid_export_power_kw_wartosc
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: grid_import_power_ma_odczyt
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: grid_export_power_ma_odczyt
+    type: bool
+    restore_value: no
+    initial_value: 'false'
   - id: pv_power_wartosc
     type: float
     restore_value: no
@@ -93,6 +125,10 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
+  - id: histereza_temp_cwu
+    type: float
+    restore_value: no
+    initial_value: '1.0'
 
   # Bilans godzinowy: dodatni = nadwyzka oddana do sieci w aktualnej godzinie.
   - id: bilans_zainicjowany
@@ -135,6 +171,26 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+  - id: energia_grzalki_kwh
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: energia_grzalki_nadwyzka_kwh
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: energia_grzalki_import_kwh
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: czas_pracy_grzalki_h
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: ostatni_pomiar_statystyk_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
   - id: grzalka_auto_start_w_godzinie
     type: bool
     restore_value: no
@@ -151,22 +207,18 @@ globals:
     type: float
     restore_value: no
     initial_value: '300.0'
-  - id: cena_zakupu_energii_zl_kwh
-    type: float
-    restore_value: no
-    initial_value: '1.00'
-  - id: cena_sprzedazy_energii_zl_kwh
-    type: float
-    restore_value: no
-    initial_value: '0.35'
-  - id: bilans_wartosciowy_wh
-    type: float
-    restore_value: no
-    initial_value: '0.0'
   - id: auto_wylaczone_przez_termostat
     type: bool
     restore_value: no
     initial_value: 'false'
+  - id: grzalka_moc_zmiana_wewnetrzna
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: grzalka_moc_zaakceptowana_proc
+    type: float
+    restore_value: no
+    initial_value: '0.0'
 
 # -- Suwaki ----------------------------------------------------------------
 number:
@@ -183,6 +235,14 @@ number:
     restore_value: false
     on_value:
       - lambda: |-
+          if (id(tryb_auto).state && !id(grzalka_moc_zmiana_wewnetrzna)) {
+            ESP_LOGW("SUWAK", "Ignoruje reczna zmiane mocy grzalki %.0f%% w trybie AUTO.", x);
+            id(grzalka_moc_zmiana_wewnetrzna) = true;
+            id(grzalka_moc).publish_state(id(grzalka_moc_zaakceptowana_proc));
+            id(grzalka_moc_zmiana_wewnetrzna) = false;
+            return;
+          }
+
           float t_max = id(temp_max_ustawienie).state;
           float t_wody = id(temp_cwu_ha).state;
           bool temp_ok = !std::isnan(t_wody);
@@ -208,6 +268,7 @@ number:
           }
 
           id(grzalka_moc_ostatnia_zmiana_ms) = millis();
+          id(grzalka_moc_zaakceptowana_proc) = x;
           id(grzalka_pwm).set_level(x / 100.0f);
           id(led_pwm).set_level(x / 100.0f);
 
@@ -255,6 +316,67 @@ number:
             ESP_LOGD("SUWAK", "Nastawa %.0fC > woda %.1fC. Nie zmieniam trybu pracy.", x, t_wody);
           }
 
+  - platform: template
+    name: "Histereza temperatury CWU"
+    id: temp_histereza_ustawienie
+    min_value: 0
+    max_value: 5
+    step: 0.5
+    unit_of_measurement: "°C"
+    optimistic: true
+    mode: slider
+    initial_value: 1.0
+    restore_value: true
+    on_value:
+      - lambda: |-
+          id(histereza_temp_cwu) = x;
+          float t_max = id(temp_max_ustawienie).state;
+          float t_wody = id(temp_cwu_ha).state;
+          bool temp_ok = !std::isnan(t_wody);
+          if (!temp_ok && id(temp_cwu_ma_odczyt)) {
+            t_wody = id(temp_cwu_wartosc);
+            temp_ok = !std::isnan(t_wody);
+          }
+
+          if (!temp_ok || std::isnan(t_max)) {
+            ESP_LOGD("TERMOSTAT", "Zmieniono histereze na %.1fC, ale brak poprawnego odczytu CWU albo nastawy.", x);
+            return;
+          }
+
+          if (t_wody >= t_max) {
+            ESP_LOGE("TERMOSTAT", "Po zmianie histerezy woda %.1fC >= nastawa %.0fC. Wylaczam grzalke i tryby pracy.", t_wody, t_max);
+            id(auto_wylaczone_przez_termostat) = true;
+            id(tryb_auto).turn_off();
+            id(tryb_manual).turn_off();
+            id(grzalka_moc).publish_state(0.0f);
+            id(grzalka_pwm).set_level(0.0f);
+            id(led_pwm).set_level(0.0f);
+          } else if (t_wody <= t_max - id(histereza_temp_cwu) &&
+                     !id(tryb_auto).state && !id(tryb_manual).state &&
+                     id(auto_wylaczone_przez_termostat)) {
+            ESP_LOGW("TERMOSTAT", "Woda %.1fC <= prog powrotu %.1fC po zmianie histerezy. Wlaczam AUTO.", t_wody, t_max - id(histereza_temp_cwu));
+            id(tryb_auto).turn_on();
+          }
+
+button:
+  - platform: template
+    name: "Reset statystyk grzałki"
+    id: reset_statystyk_grzalki
+    icon: "mdi:restart"
+    on_press:
+      - lambda: |-
+          id(energia_grzalki_kwh) = 0.0f;
+          id(energia_grzalki_nadwyzka_kwh) = 0.0f;
+          id(energia_grzalki_import_kwh) = 0.0f;
+          id(czas_pracy_grzalki_h) = 0.0f;
+          id(ostatni_pomiar_statystyk_ms) = millis();
+          id(zuzycie_grzalki_kwh).publish_state(0.0f);
+          id(zuzycie_grzalki_nadwyzka_kwh).publish_state(0.0f);
+          id(zuzycie_grzalki_import_kwh).publish_state(0.0f);
+          id(sprawnosc_grzalki_proc).publish_state(0.0f);
+          id(czas_pracy_grzalki).publish_state(0.0f);
+          ESP_LOGW("STAT_GRZALKA", "Zresetowano statystyki grzalki.");
+
 # -- Sensory ---------------------------------------------------------------
 sensor:
   - platform: homeassistant
@@ -262,10 +384,31 @@ sensor:
     entity_id: sensor.energy_grid_licznik_energii_wm_bus_gateway_moc_poboru_licznik_energii_wm_bus_gateway_moc_oddawana_net_power
     on_value:
       - lambda: |-
+          if (id(grid_import_power_ma_odczyt) && id(grid_export_power_ma_odczyt)) {
+            return;
+          }
           id(grid_power_wartosc) = x;
           id(grid_power_ostatni_odczyt_ms) = millis();
           id(pv_power_przy_grid_wartosc) = id(pv_power_wartosc);
           id(grzalka_moc_przy_grid_w) = id(grzalka_moc).state / 100.0f * 1500.0f;
+
+  - platform: homeassistant
+    id: grid_import_power_ha
+    entity_id: sensor.licznik_energii_wm_bus_gateway_moc_poboru
+    on_value:
+      - lambda: |-
+          id(grid_import_power_kw_wartosc) = x;
+          id(grid_import_power_ma_odczyt) = !std::isnan(x);
+      - script.execute: aktualizuj_bilans_mocy_sieci
+
+  - platform: homeassistant
+    id: grid_export_power_ha
+    entity_id: sensor.licznik_energii_wm_bus_gateway_moc_oddawana
+    on_value:
+      - lambda: |-
+          id(grid_export_power_kw_wartosc) = x;
+          id(grid_export_power_ma_odczyt) = !std::isnan(x);
+      - script.execute: aktualizuj_bilans_mocy_sieci
 
   - platform: homeassistant
     id: pv_power_ha
@@ -312,9 +455,9 @@ sensor:
             id(grzalka_moc).publish_state(0.0f);
             id(grzalka_pwm).set_level(0.0f);
             id(led_pwm).set_level(0.0f);
-          } else if (!std::isnan(t_max) && x < t_max && !id(tryb_auto).state &&
+          } else if (!std::isnan(t_max) && x <= t_max - id(histereza_temp_cwu) && !id(tryb_auto).state &&
                      !id(tryb_manual).state && id(auto_wylaczone_przez_termostat)) {
-            ESP_LOGW("TERMOSTAT", "Temperatura CWU %.1fC spadla ponizej nastawy %.0fC po odcieciu termostatem. Wlaczam AUTO.", x, t_max);
+            ESP_LOGW("TERMOSTAT", "Temperatura CWU %.1fC spadla do progu powrotu %.1fC po odcieciu termostatem. Wlaczam AUTO.", x, t_max - id(histereza_temp_cwu));
             id(tryb_auto).turn_on();
           }
 
@@ -339,9 +482,9 @@ sensor:
             id(grzalka_moc).publish_state(0.0f);
             id(grzalka_pwm).set_level(0.0f);
             id(led_pwm).set_level(0.0f);
-          } else if (!std::isnan(t_max) && x < t_max && !id(tryb_auto).state &&
+          } else if (!std::isnan(t_max) && x <= t_max - id(histereza_temp_cwu) && !id(tryb_auto).state &&
                      !id(tryb_manual).state && id(auto_wylaczone_przez_termostat)) {
-            ESP_LOGW("TERMOSTAT", "Temperatura CWU %.1fC spadla ponizej nastawy %.0fC po odcieciu termostatem. Wlaczam AUTO.", x, t_max);
+            ESP_LOGW("TERMOSTAT", "Temperatura CWU %.1fC spadla do progu powrotu %.1fC po odcieciu termostatem. Wlaczam AUTO.", x, t_max - id(histereza_temp_cwu));
             id(tryb_auto).turn_on();
           }
 
@@ -366,9 +509,9 @@ sensor:
             id(grzalka_moc).publish_state(0.0f);
             id(grzalka_pwm).set_level(0.0f);
             id(led_pwm).set_level(0.0f);
-          } else if (!std::isnan(t_max) && x < t_max && !id(tryb_auto).state &&
+          } else if (!std::isnan(t_max) && x <= t_max - id(histereza_temp_cwu) && !id(tryb_auto).state &&
                      !id(tryb_manual).state && id(auto_wylaczone_przez_termostat)) {
-            ESP_LOGW("TERMOSTAT", "Temperatura CWU %.1fC spadla ponizej nastawy %.0fC po odcieciu termostatem. Wlaczam AUTO.", x, t_max);
+            ESP_LOGW("TERMOSTAT", "Temperatura CWU %.1fC spadla do progu powrotu %.1fC po odcieciu termostatem. Wlaczam AUTO.", x, t_max - id(histereza_temp_cwu));
             id(tryb_auto).turn_on();
           }
 
@@ -393,9 +536,9 @@ sensor:
             id(grzalka_moc).publish_state(0.0f);
             id(grzalka_pwm).set_level(0.0f);
             id(led_pwm).set_level(0.0f);
-          } else if (!std::isnan(t_max) && x < t_max && !id(tryb_auto).state &&
+          } else if (!std::isnan(t_max) && x <= t_max - id(histereza_temp_cwu) && !id(tryb_auto).state &&
                      !id(tryb_manual).state && id(auto_wylaczone_przez_termostat)) {
-            ESP_LOGW("TERMOSTAT", "Temperatura CWU %.1fC spadla ponizej nastawy %.0fC po odcieciu termostatem. Wlaczam AUTO.", x, t_max);
+            ESP_LOGW("TERMOSTAT", "Temperatura CWU %.1fC spadla do progu powrotu %.1fC po odcieciu termostatem. Wlaczam AUTO.", x, t_max - id(histereza_temp_cwu));
             id(tryb_auto).turn_on();
           }
 
@@ -423,6 +566,30 @@ sensor:
     update_interval: 5s
 
   - platform: template
+    name: "Moc poboru netto"
+    id: moc_poboru_netto
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    icon: "mdi:transmission-tower-import"
+    lambda: |-
+      return id(grid_power_wartosc) > 0.0f ? id(grid_power_wartosc) : 0.0f;
+    update_interval: 5s
+
+  - platform: template
+    name: "Moc oddawana netto"
+    id: moc_oddawana_netto
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    icon: "mdi:transmission-tower-export"
+    lambda: |-
+      return id(grid_power_wartosc) < 0.0f ? -id(grid_power_wartosc) : 0.0f;
+    update_interval: 5s
+
+  - platform: template
     name: "Moc grzałki W"
     id: moc_grzalki_w
     unit_of_measurement: "W"
@@ -434,6 +601,68 @@ sensor:
     update_interval: 5s
 
   - platform: template
+    name: "Zużycie grzałki"
+    id: zuzycie_grzalki_kwh
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    icon: "mdi:lightning-bolt"
+    lambda: |-
+      return id(energia_grzalki_kwh);
+    update_interval: 30s
+
+  - platform: template
+    name: "Zużycie grzałki z nadwyżki PV"
+    id: zuzycie_grzalki_nadwyzka_kwh
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    icon: "mdi:solar-power-variant"
+    lambda: |-
+      return id(energia_grzalki_nadwyzka_kwh);
+    update_interval: 30s
+
+  - platform: template
+    name: "Zużycie grzałki przy imporcie"
+    id: zuzycie_grzalki_import_kwh
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    icon: "mdi:transmission-tower-import"
+    lambda: |-
+      return id(energia_grzalki_import_kwh);
+    update_interval: 30s
+
+  - platform: template
+    name: "Sprawność grzałki"
+    id: sprawnosc_grzalki_proc
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 1
+    icon: "mdi:percent-circle-outline"
+    lambda: |-
+      if (id(energia_grzalki_kwh) <= 0.0f) return 0.0f;
+      float sprawnosc = (id(energia_grzalki_nadwyzka_kwh) / id(energia_grzalki_kwh)) * 100.0f;
+      if (sprawnosc > 100.0f) sprawnosc = 100.0f;
+      if (sprawnosc < 0.0f) sprawnosc = 0.0f;
+      return sprawnosc;
+    update_interval: 30s
+
+  - platform: template
+    name: "Czas pracy grzałki"
+    id: czas_pracy_grzalki
+    unit_of_measurement: "h"
+    state_class: total_increasing
+    accuracy_decimals: 2
+    icon: "mdi:timer-outline"
+    lambda: |-
+      return id(czas_pracy_grzalki_h);
+    update_interval: 30s
+
+  - platform: template
     name: "Bilans godziny"
     id: bilans_godzinowy_energia
     unit_of_measurement: "Wh"
@@ -441,16 +670,6 @@ sensor:
     icon: "mdi:counter"
     lambda: |-
       return id(bilans_godzinowy_wh);
-    update_interval: 30s
-
-  - platform: template
-    name: "Bilans wartościowy"
-    id: bilans_wartosciowy_energia
-    unit_of_measurement: "Wh"
-    accuracy_decimals: 0
-    icon: "mdi:cash-clock"
-    lambda: |-
-      return id(bilans_wartosciowy_wh);
     update_interval: 30s
 
   - platform: template
@@ -491,16 +710,17 @@ text_sensor:
       if (!std::isnan(t_max) && id(temp_cwu_wartosc) >= t_max) {
         return std::string("Temperatura osiągnięta");
       }
+      if (!std::isnan(t_max) && id(auto_wylaczone_przez_termostat) &&
+          id(temp_cwu_wartosc) > t_max - id(histereza_temp_cwu)) {
+        return std::string("Czekam na spadek temperatury");
+      }
 
       if (id(grid_power_wartosc) > 50.0f) {
         return std::string("Pobór z sieci");
       }
 
       float wymagany_bufor_wh = id(bufor_startu_grzalki_wh) + id(rezerwa_exportu_godzinowego_wh);
-      if (!id(grzalka_auto_start_w_godzinie) && id(bilans_wartosciowy_wh) < wymagany_bufor_wh) {
-        if (id(bilans_godzinowy_wh) > 0.0f) {
-          return std::string("Zbieram bufor net-billing");
-        }
+      if (!id(grzalka_auto_start_w_godzinie) && id(bilans_godzinowy_wh) < wymagany_bufor_wh) {
         return std::string("Zbieram bufor");
       }
 
@@ -527,9 +747,12 @@ switch:
       - logger.log: "Tryb AUTO aktywny"
       - lambda: |-
           id(auto_wylaczone_przez_termostat) = false;
+          id(grzalka_moc_zmiana_wewnetrzna) = true;
       - number.set:
           id: grzalka_moc
           value: 0
+      - lambda: |-
+          id(grzalka_moc_zmiana_wewnetrzna) = false;
       - delay: 1s
       - script.execute: regulacja_auto
     turn_off_action:
@@ -581,6 +804,110 @@ switch:
 
 # -- Skrypty logiczne ------------------------------------------------------
 script:
+  - id: aktualizuj_bilans_mocy_sieci
+    mode: restart
+    then:
+      - lambda: |-
+          if (!id(grid_import_power_ma_odczyt) || !id(grid_export_power_ma_odczyt)) {
+            return;
+          }
+
+          float import_kw = id(grid_import_power_kw_wartosc);
+          float export_kw = id(grid_export_power_kw_wartosc);
+          if (std::isnan(import_kw) || import_kw < 0.0f) import_kw = 0.0f;
+          if (std::isnan(export_kw) || export_kw < 0.0f) export_kw = 0.0f;
+
+          id(grid_power_wartosc) = (import_kw - export_kw) * 1000.0f;
+          id(grid_power_ostatni_odczyt_ms) = millis();
+          id(pv_power_przy_grid_wartosc) = id(pv_power_wartosc);
+          id(grzalka_moc_przy_grid_w) = id(grzalka_moc).state / 100.0f * 1500.0f;
+
+          id(moc_sieci_waty).publish_state(id(grid_power_wartosc));
+          id(bilans_pobrana_oddana).publish_state(id(grid_power_wartosc));
+          id(moc_poboru_netto).publish_state(id(grid_power_wartosc) > 0.0f ? id(grid_power_wartosc) : 0.0f);
+          id(moc_oddawana_netto).publish_state(id(grid_power_wartosc) < 0.0f ? -id(grid_power_wartosc) : 0.0f);
+
+  - id: publikuj_stany_lokalne
+    mode: restart
+    then:
+      - lambda: |-
+          float moc_proc = id(grzalka_moc).state;
+          if (std::isnan(moc_proc)) moc_proc = id(grzalka_moc_zaakceptowana_proc);
+          if (std::isnan(moc_proc)) moc_proc = 0.0f;
+          if (moc_proc > 100.0f) moc_proc = 100.0f;
+          if (moc_proc < 0.0f) moc_proc = 0.0f;
+
+          float sprawnosc = id(energia_grzalki_kwh) > 0.0f
+              ? (id(energia_grzalki_nadwyzka_kwh) / id(energia_grzalki_kwh)) * 100.0f
+              : 0.0f;
+          if (sprawnosc > 100.0f) sprawnosc = 100.0f;
+          if (sprawnosc < 0.0f) sprawnosc = 0.0f;
+
+          id(grzalka_moc_zmiana_wewnetrzna) = true;
+          id(grzalka_moc).publish_state(moc_proc);
+          id(grzalka_moc_zmiana_wewnetrzna) = false;
+          id(grzalka_moc_zaakceptowana_proc) = moc_proc;
+          id(moc_grzalki_w).publish_state(moc_proc / 100.0f * 1500.0f);
+          id(zuzycie_grzalki_kwh).publish_state(id(energia_grzalki_kwh));
+          id(zuzycie_grzalki_nadwyzka_kwh).publish_state(id(energia_grzalki_nadwyzka_kwh));
+          id(zuzycie_grzalki_import_kwh).publish_state(id(energia_grzalki_import_kwh));
+          id(sprawnosc_grzalki_proc).publish_state(sprawnosc);
+          id(czas_pracy_grzalki).publish_state(id(czas_pracy_grzalki_h));
+          id(moc_sieci_waty).publish_state(id(grid_power_wartosc));
+          id(bilans_pobrana_oddana).publish_state(id(grid_power_wartosc));
+          id(moc_poboru_netto).publish_state(id(grid_power_wartosc) > 0.0f ? id(grid_power_wartosc) : 0.0f);
+          id(moc_oddawana_netto).publish_state(id(grid_power_wartosc) < 0.0f ? -id(grid_power_wartosc) : 0.0f);
+          id(bilans_godzinowy_energia).publish_state(id(bilans_godzinowy_wh));
+          id(bilans_godzinowy_moc_banku).publish_state(id(moc_banku_godzinowego_w));
+          id(bilans_godzinowy_moc_okna).publish_state(id(srednia_moc_okna_w));
+          ESP_LOGD("STANY", "Opublikowano lokalne stany po starcie lub ponownym polaczeniu.");
+
+  - id: aktualizuj_statystyki_grzalki
+    mode: queued
+    then:
+      - lambda: |-
+          uint32_t teraz_ms = millis();
+          if (id(ostatni_pomiar_statystyk_ms) == 0) {
+            id(ostatni_pomiar_statystyk_ms) = teraz_ms;
+            return;
+          }
+
+          float dt_h = (teraz_ms - id(ostatni_pomiar_statystyk_ms)) / 3600000.0f;
+          id(ostatni_pomiar_statystyk_ms) = teraz_ms;
+
+          if (dt_h <= 0.0f || dt_h > 0.1f) {
+            return;
+          }
+
+          float moc_kw = id(grzalka_moc).state / 100.0f * 1.5f;
+          if (moc_kw <= 0.0f) {
+            return;
+          }
+
+          float energia_okna_kwh = moc_kw * dt_h;
+          float import_kw = id(grid_power_wartosc) > 0.0f ? id(grid_power_wartosc) / 1000.0f : 0.0f;
+          if (std::isnan(import_kw) || import_kw < 0.0f) import_kw = 0.0f;
+          if (import_kw > moc_kw) import_kw = moc_kw;
+
+          float energia_import_kwh = import_kw * dt_h;
+          float energia_nadwyzka_kwh = energia_okna_kwh - energia_import_kwh;
+          if (energia_nadwyzka_kwh < 0.0f) energia_nadwyzka_kwh = 0.0f;
+
+          id(energia_grzalki_kwh) += energia_okna_kwh;
+          id(energia_grzalki_import_kwh) += energia_import_kwh;
+          id(energia_grzalki_nadwyzka_kwh) += energia_nadwyzka_kwh;
+          id(czas_pracy_grzalki_h) += dt_h;
+          id(zuzycie_grzalki_kwh).publish_state(id(energia_grzalki_kwh));
+          id(zuzycie_grzalki_import_kwh).publish_state(id(energia_grzalki_import_kwh));
+          id(zuzycie_grzalki_nadwyzka_kwh).publish_state(id(energia_grzalki_nadwyzka_kwh));
+          float sprawnosc = id(energia_grzalki_kwh) > 0.0f
+              ? (id(energia_grzalki_nadwyzka_kwh) / id(energia_grzalki_kwh)) * 100.0f
+              : 0.0f;
+          if (sprawnosc > 100.0f) sprawnosc = 100.0f;
+          if (sprawnosc < 0.0f) sprawnosc = 0.0f;
+          id(sprawnosc_grzalki_proc).publish_state(sprawnosc);
+          id(czas_pracy_grzalki).publish_state(id(czas_pracy_grzalki_h));
+
   - id: reakcja_na_suwak_temp
     mode: restart
     then:
@@ -675,7 +1002,9 @@ script:
 
             if (nowy_prog != aktualny_prog) {
               ESP_LOGE("BEZPIECZNIK", "Szybkie ciecie. Siec=%.0fW skoryg=%.0fW wiek=%us bank=%.0fW grzalka=%.0fW cel_export=%.0fW dostepne=%.0fW. Ustawiam %.0f%%", id(grid_power_wartosc), skorygowana_moc_sieci_w, wiek_grid_ms / 1000, moc_banku_w, moc_grzalki_w, id(docelowy_export_w), dostepna_moc_grzalki_w, nowy_prog);
+              id(grzalka_moc_zmiana_wewnetrzna) = true;
               id(grzalka_moc).publish_state(nowy_prog);
+              id(grzalka_moc_zmiana_wewnetrzna) = false;
               id(grzalka_pwm).set_level(nowy_prog / 100.0f);
               id(led_pwm).set_level(nowy_prog / 100.0f);
             }
@@ -727,7 +1056,6 @@ script:
             id(ostatni_export_kwh) = c_export;
             id(ostatni_odczyt_ms) = millis();
             id(bilans_godzinowy_wh) = 0.0f;
-            id(bilans_wartosciowy_wh) = 0.0f;
             id(srednia_moc_okna_w) = 0.0f;
             id(moc_banku_godzinowego_w) = 0.0f;
             id(grzalka_auto_start_w_godzinie) = false;
@@ -771,12 +1099,6 @@ script:
           float import_godzina_wh = (c_import - id(start_import_kwh_godzina)) * 1000.0f;
           float export_godzina_wh = (c_export - id(start_export_kwh_godzina)) * 1000.0f;
           id(bilans_godzinowy_wh) = export_godzina_wh - import_godzina_wh;
-          float wspolczynnik_net_billing = 0.0f;
-          if (id(cena_zakupu_energii_zl_kwh) > 0.0f && id(cena_sprzedazy_energii_zl_kwh) > 0.0f) {
-            wspolczynnik_net_billing = id(cena_sprzedazy_energii_zl_kwh) / id(cena_zakupu_energii_zl_kwh);
-            if (wspolczynnik_net_billing > 1.0f) wspolczynnik_net_billing = 1.0f;
-          }
-          id(bilans_wartosciowy_wh) = export_godzina_wh * wspolczynnik_net_billing - import_godzina_wh;
 
           float pozostalo_s = 1800.0f;
           if (czas_ok) {
@@ -785,7 +1107,7 @@ script:
           }
 
           float moc_z_banku_w = 0.0f;
-          float bilans_do_wykorzystania_wh = id(bilans_wartosciowy_wh) - id(rezerwa_exportu_godzinowego_wh);
+          float bilans_do_wykorzystania_wh = id(bilans_godzinowy_wh) - id(rezerwa_exportu_godzinowego_wh);
           if (bilans_do_wykorzystania_wh > 5.0f) {
             moc_z_banku_w = (bilans_do_wykorzystania_wh * 3600.0f) / pozostalo_s;
             if (moc_z_banku_w > 1500.0f) moc_z_banku_w = 1500.0f;
@@ -841,8 +1163,8 @@ script:
 
           float wymagany_bufor_przed_startem_wh = id(bufor_startu_grzalki_wh) + id(rezerwa_exportu_godzinowego_wh);
           if (aktualny_prog == 0.0f && !id(grzalka_auto_start_w_godzinie) &&
-              id(bilans_wartosciowy_wh) < wymagany_bufor_przed_startem_wh) {
-            ESP_LOGD("BILANS_H", "Zbieram bufor przed pierwszym startem grzalki: bilans_wart=%.0fWh bilans=%.0fWh wymagane=%.0fWh rezerwa=%.0fWh", id(bilans_wartosciowy_wh), id(bilans_godzinowy_wh), wymagany_bufor_przed_startem_wh, id(rezerwa_exportu_godzinowego_wh));
+              id(bilans_godzinowy_wh) < wymagany_bufor_przed_startem_wh) {
+            ESP_LOGD("BILANS_H", "Zbieram bufor przed pierwszym startem grzalki: bilans=%.0fWh wymagane=%.0fWh rezerwa=%.0fWh", id(bilans_godzinowy_wh), wymagany_bufor_przed_startem_wh, id(rezerwa_exportu_godzinowego_wh));
             return;
           }
 
@@ -875,14 +1197,16 @@ script:
           if (nowy_prog > 100.0f) nowy_prog = 100.0f;
           if (nowy_prog < 0.0f) nowy_prog = 0.0f;
 
-          ESP_LOGW("BILANS_H", "Siec=%.0fW | skoryg=%.0fW | wiek=%us | chwilowo=%.0fW | Okno30s=%.0fW | bilans_h=%.0fWh | bilans_wart=%.0fWh | bank=%.0fW | cel_export=%.0fW | dostepne=%.0fW | cel=%.0f%%", id(grid_power_wartosc), skorygowana_moc_sieci_w, wiek_grid_ms / 1000, chwilowy_bilans_sieci_w, realny_bilans_sieci_w, id(bilans_godzinowy_wh), id(bilans_wartosciowy_wh), moc_z_banku_w, id(docelowy_export_w), dostepna_moc_grzalki_w, nowy_prog);
+          ESP_LOGW("BILANS_H", "Siec=%.0fW | skoryg=%.0fW | wiek=%us | chwilowo=%.0fW | Okno30s=%.0fW | bilans_h=%.0fWh | bank=%.0fW | cel_export=%.0fW | dostepne=%.0fW | cel=%.0f%%", id(grid_power_wartosc), skorygowana_moc_sieci_w, wiek_grid_ms / 1000, chwilowy_bilans_sieci_w, realny_bilans_sieci_w, id(bilans_godzinowy_wh), moc_z_banku_w, id(docelowy_export_w), dostepna_moc_grzalki_w, nowy_prog);
 
           if (nowy_prog != aktualny_prog) {
+            id(grzalka_moc_zmiana_wewnetrzna) = true;
             id(grzalka_moc).publish_state(nowy_prog);
+            id(grzalka_moc_zmiana_wewnetrzna) = false;
             id(grzalka_pwm).set_level(nowy_prog / 100.0f);
             id(led_pwm).set_level(nowy_prog / 100.0f);
             if (aktualny_prog == 0.0f && nowy_prog > 0.0f) {
               id(grzalka_auto_start_w_godzinie) = true;
-              ESP_LOGW("BILANS_H", "Pierwszy start grzalki w tej godzinie po uzbieraniu bufora %.0fWh. bilans_wart=%.0fWh bilans=%.0fWh", wymagany_bufor_przed_startem_wh, id(bilans_wartosciowy_wh), id(bilans_godzinowy_wh));
+              ESP_LOGW("BILANS_H", "Pierwszy start grzalki w tej godzinie po uzbieraniu bufora %.0fWh. bilans=%.0fWh", wymagany_bufor_przed_startem_wh, id(bilans_godzinowy_wh));
             }
           }
