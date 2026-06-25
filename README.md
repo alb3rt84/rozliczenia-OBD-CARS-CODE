@@ -10,10 +10,10 @@ Założenia:
 - na początku każdej godziny zapamiętywany jest stan liczników,
 - dodatni `Bilans godzinowy energia` oznacza nadwyżkę oddaną do sieci w aktualnej godzinie,
 - licznik bilansowania działa także przy wyłączonym trybie AUTO oraz w trybie MANUAL,
-- tryb AUTO dobiera moc grzałki z bieżącego bilansu sieci oraz banku godzinowego, żeby nie zwiększać mocy przy aktualnym poborze z sieci,
+- tryb AUTO dobiera moc grzałki z różnicy całkowitego importu i eksportu energii w ostatnim oknie licznikowym, żeby nie zwiększać mocy, gdy narasta realny pobór z sieci,
 - częstsze odczyty PV korygują ostatni pomiar mocy sieci o zmianę PV i mocy grzałki; szybka reakcja PV służy do cięcia mocy tylko przy większym niedoborze, a zwiększanie mocy zostaje w głównej pętli bilansowania,
-- zwiększanie mocy w AUTO jest limitowane krokami, żeby wolniejszy odczyt licznika sieci zdążył potwierdzić realny wpływ grzałki,
-- kolejne zwiększenie mocy jest wstrzymywane do czasu odczytu mocy sieci nowszego niż ostatnia zmiana grzałki oraz 60 sekund stabilizacji po tej zmianie,
+- zwiększanie mocy w AUTO jest limitowane krokami, żeby wolniejszy odczyt liczników energii zdążył potwierdzić realny wpływ grzałki,
+- kolejne zwiększenie mocy jest wstrzymywane do czasu odczytu liczników energii nowszego niż ostatnia zmiana grzałki oraz 60 sekund stabilizacji po tej zmianie,
 - osiągnięcie albo przekroczenie zadanej temperatury CWU oraz obniżenie nastawy poniżej aktualnej temperatury natychmiast wyłącza grzałkę oraz tryby AUTO/MANUAL,
 - spadek temperatury CWU poniżej nastawy o ustawioną histerezę automatycznie włącza tryb AUTO tylko wtedy, gdy AUTO zostało wcześniej wyłączone przez termostat,
 - histereza temperatury CWU ma osobny suwak `0-5°C` z krokiem `0.5°C`,
@@ -22,13 +22,14 @@ Założenia:
 - konfiguracja próbuje odczytać temperaturę CWU z kilku popularnych `entity_id`; działający odczyt jest widoczny w logu `TERMOSTAT`,
 - lokalny `web_server` ESPHome jest dostępny na porcie `80`; w normalnej sieci po adresie IP urządzenia albo `http://grzaka-bojlera.local`, a w fallback hotspocie zwykle pod `http://192.168.4.1`,
 - ESP32 nie restartuje się automatycznie przy braku WiFi albo połączenia API z Home Assistant i po ponownym połączeniu publikuje lokalne stany suwaka oraz sensorów,
+- jeśli przez `120 s` nie pojawi się żaden świeży odczyt licznika energii albo encje importu/eksportu staną się niedostępne, AUTO zostaje włączone, ale moc grzałki jest zerowana do czasu powrotu poprawnych danych,
 - bufor energii przed pierwszym startem w godzinie zbiera się także przy wyłączonym AUTO; pierwszy start wymaga około `70 Wh` dodatniego bilansu (`60 Wh` bufora + `10 Wh` rezerwy eksportu),
 - regulacja AUTO zostawia docelowo około `300 W` eksportu jako margines bezpieczeństwa, zamiast dążyć do zera bilansu,
 - sterowanie działa pod autokonsumpcję i godzinowy bilans energii: eksport oraz import są liczone energetycznie w Wh,
 - chwilowy bilans sieci jest liczony z całkowitej mocy importu i eksportu gatewaya: `Moc poboru - Moc oddawana`; dodatkowe sensory `Moc poboru netto` i `Moc oddawana netto` pokazują wartości po tym porównaniu,
-- uproszczone nazwy sensorów bilansu: `Bilans godziny`, `Moc chwilowa 30s`, `Dostępna moc z bufora` oraz tekstowy `Status bilansu grzałki`,
+- uproszczone nazwy sensorów bilansu: `Bilans godziny`, `Pobór godziny`, `Oddanie godziny`, `Moc chwilowa 30s`, `Moc banku godzinowego` oraz tekstowy `Status bilansu grzałki`,
 - statystyki grzałki są liczone lokalnie: `Zużycie grzałki`, `Zużycie grzałki z nadwyżki PV`, `Zużycie grzałki przy imporcie`, `Sprawność grzałki` oraz `Czas pracy grzałki`, z przyciskiem resetu,
-- `Bilans godzinowy moc banku` to moc, którą sterownik może dodatkowo wykorzystać, żeby do końca godziny zejść z bilansem możliwie blisko zera.
+- `Moc banku godzinowego` jest informacyjna; sterownik nie zużywa już banku godzinowego jako dodatkowej mocy, żeby nie generować realnego importu kWh.
 
 Przed wgraniem dodaj do `secrets.yaml`:
 
