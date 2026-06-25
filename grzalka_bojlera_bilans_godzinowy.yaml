@@ -458,7 +458,7 @@ sensor:
 
   - platform: homeassistant
     id: pv_power_ha
-    entity_id: sensor.inverter_pv1_power
+    entity_id: sensor.inverter_power
     on_value:
       - lambda: |-
           if (std::isnan(x)) {
